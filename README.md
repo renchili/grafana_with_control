@@ -330,8 +330,7 @@ interface PermissionSet {
 ---
 
 # 4. Drafts 模块
-
-![Drafts Mock]
+![Drafts Mock](grafana_platform_drafts_mock.png)
 
 ## 4.1 模块目标
 
