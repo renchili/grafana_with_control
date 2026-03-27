@@ -1,0 +1,24 @@
+{
+  "type": "app",
+  "id": "company-grafana-control-plane-app",
+  "name": "Grafana Control Plane",
+  "includes": [
+    {
+      "type": "page",
+      "name": "Drafts",
+      "path": "/a/company-grafana-control-plane-app/drafts",
+      "addToNav": true,
+      "defaultNav": true
+    },
+    {
+      "type": "page",
+      "name": "Conflict Resolve",
+      "path": "/a/company-grafana-control-plane-app/conflict",
+      "addToNav": true
+    }
+  ],
+  "dependencies": {
+    "grafanaDependency": ">=10.0.0",
+    "plugins": []
+  }
+}
