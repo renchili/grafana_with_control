@@ -34,25 +34,38 @@ export const useConflict = (draftId: number) => {
     load();
   }, [draftId, load]);
 
-  const runAction = useCallback(
-    async (
-      action: 'rebase' | 'save_as_copy' | 'takeover',
-      payload?: { title?: string; uid?: string }
-    ): Promise<ConflictActionResponse | undefined> => {
-      setState((prev) => ({ ...prev, acting: true, error: undefined }));
-      try {
-        let result: ConflictActionResponse;
-        if (action === 'rebase') result = await rebaseDraft(draftId);
-        else if (action === 'save_as_copy') result = await saveAsCopy(draftId, payload);
-        else result = await takeoverDraft(draftId);
-        await load();
-        return result;
-      } catch (error) {
-        setState((prev) => ({ ...prev, acting: false, error: error instanceof Error ? error.message : 'Action failed' }));
-      }
-    },
-    [draftId, load]
-  );
+const runAction = useCallback(
+  async (
+    action: 'rebase' | 'save_as_copy' | 'takeover',
+    payload?: { title?: string; uid?: string }
+  ): Promise<ConflictActionResponse | undefined> => {
+    setState((prev) => ({ ...prev, acting: true, error: undefined }));
 
+    try {
+      let result: ConflictActionResponse;
+
+      if (action === 'rebase') {
+        result = await rebaseDraft(draftId);
+      } else if (action === 'save_as_copy') {
+        result = await saveAsCopy(draftId, payload);
+      } else {
+        result = await takeoverDraft(draftId);
+      }
+
+      await load();
+      return result;
+
+    } catch (error) {
+      setState((prev) => ({
+        ...prev,
+        acting: false,
+        error: error instanceof Error ? error.message : 'Action failed',
+      }));
+
+      return undefined; // ✅ 必须加这个
+    }
+  },
+  [draftId, load]
+);
   return { ...state, reload: load, runAction };
 };
