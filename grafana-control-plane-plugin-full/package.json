@@ -1,0 +1,16 @@
+{
+  "name": "grafana-control-plane-app",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "echo 'Use the official create-plugin scaffold build pipeline'",
+    "dev": "echo 'Use the official create-plugin scaffold dev pipeline'"
+  },
+  "dependencies": {
+    "@grafana/data": "latest",
+    "@grafana/runtime": "latest",
+    "@grafana/ui": "latest",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }
+}
