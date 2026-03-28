@@ -30,7 +30,21 @@ export const ConflictPage: React.FC = () => {
         </HorizontalGroup>
 
         {loading && <div style={{ padding: 40, textAlign: 'center' }}><Spinner size={32} /></div>}
-        {error && <Alert title="Failed to load conflict" severity="error">{error}</Alert>}
+
+        {!loading && error && (
+          <Alert title="Service temporarily unavailable" severity="warning">
+            <div style={{ marginBottom: 12 }}>
+              We can’t load conflict details right now because the backend service is unavailable or not configured.
+            </div>
+            <HorizontalGroup>
+              <Button onClick={() => reload()}>Try again</Button>
+              <Button variant="secondary" onClick={() => locationService.push('/a/rody-grafanacontrol-app/drafts')}>
+                Back to Drafts
+              </Button>
+            </HorizontalGroup>
+            <div style={{ marginTop: 12, color: 'var(--text-secondary)' }}>{error}</div>
+          </Alert>
+        )}
 
         {!loading && data && (
           <>
