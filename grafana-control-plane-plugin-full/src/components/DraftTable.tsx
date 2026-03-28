@@ -46,7 +46,7 @@ export const DraftTable: React.FC<Props> = ({ data, actingDraftId, onPublish, on
                       Resume
                     </Button>
                     {draft.status === 'conflict' ? (
-                      <Button size="sm" onClick={() => locationService.push(`/a/company-grafana-control-plane-app/conflict?draftId=${draft.draftId}`)}>
+                      <Button size="sm" onClick={() => locationService.push(`/a/rody-grafanacontrol-app/conflict?draftId=${draft.draftId}`)}>
                         Resolve
                       </Button>
                     ) : (

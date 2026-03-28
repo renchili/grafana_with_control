@@ -402,9 +402,9 @@ Draft Service 负责：
 
 - 创建 draft
 - 恢复 draft
-- 自动保存
-- 查询用户 draft 列表
-- 标记状态
+- autosave
+- 查询草稿列表
+- 标记 abandoned / conflict
 
 ## 4.7 Drafts API
 
@@ -461,7 +461,7 @@ interface PublishJob {
   createdAt: string;
   finishedAt?: string;
   errorCode?: string;
-  errorMessage?: string;
+ errorMessage?: string;
 }
 ```
 

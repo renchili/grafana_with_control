@@ -1,11 +1,11 @@
 {
   "type": "app",
-  "id": "company-grafana-control-plane-app",
+  "id": "rody-grafanacontrol-app",
   "name": "Grafana Control Plane",
   "info": {
     "description": "Governed drafts and conflict resolution for Grafana resources",
     "author": {
-      "name": "OpenAI"
+      "name": "RENCHI LI"
     },
     "version": "%VERSION%",
     "updated": "%TODAY%"
@@ -14,14 +14,14 @@
     {
       "type": "page",
       "name": "Drafts",
-      "path": "/a/company-grafana-control-plane-app/drafts",
+      "path": "/a/rody-grafanacontrol-app/drafts",
       "addToNav": true,
       "defaultNav": true
     },
     {
       "type": "page",
       "name": "Conflict Resolve",
-      "path": "/a/company-grafana-control-plane-app/conflict",
+      "path": "/a/rody-grafanacontrol-app/conflict",
       "addToNav": true
     }
   ],

@@ -40,8 +40,8 @@
 
 ## 页面访问
 插件页面路径：
-- `/a/company-grafana-control-plane-app/drafts`
-- `/a/company-grafana-control-plane-app/conflict?draftId=<id>`
+- `/a/rody-grafanacontrol-app/drafts`
+- `/a/rody-grafanacontrol-app/conflict?draftId=<id>`
 
 ## 依赖的后端接口
 - `GET /api/platform/v1/me/drafts`
