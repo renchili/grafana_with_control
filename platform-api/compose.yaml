@@ -1,0 +1,12 @@
+services:
+  platform-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: grafana-control-plane-platform-api:local
+    container_name: grafana-control-plane-platform-api
+    environment:
+      PORT: ${PORT:-8081}
+    ports:
+      - "${PORT:-8081}:8081"
+    restart: unless-stopped
