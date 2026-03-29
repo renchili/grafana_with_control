@@ -9,10 +9,15 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o /out/platform-api ./cmd/server
 
-FROM gcr.io/distroless/static-debian12:nonroot
-WORKDIR /
+FROM debian:bookworm-slim
+WORKDIR /app
+
 ENV PORT=8081
 EXPOSE 8081
-COPY --from=builder /out/platform-api /platform-api
-USER nonroot:nonroot
-ENTRYPOINT ["/platform-api"]
+
+COPY --from=builder /out/platform-api /app/platform-api
+
+RUN useradd -r -u 10001 appuser
+USER appuser
+
+ENTRYPOINT ["/app/platform-api"]

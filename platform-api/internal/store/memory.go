@@ -150,4 +150,3 @@ func (s *MemoryStore) TakeoverDraft(id int64) (*model.ActionResponse, bool) {
 	d.UpdatedAt = time.Now().Format(time.RFC3339)
 	return &model.ActionResponse{Success: true, Message: fmt.Sprintf("takeover completed for draft %d", id)}, true
 }
-}
