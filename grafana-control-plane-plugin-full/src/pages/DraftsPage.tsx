@@ -1,6 +1,6 @@
 import React from 'react';
 import { PluginPage } from '@grafana/runtime';
-import { Button, HorizontalGroup, Spinner, VerticalGroup } from '@grafana/ui';
+import { Button, Spinner, VerticalGroup } from '@grafana/ui';
 import { DraftTable } from '../components/DraftTable';
 import { useDrafts } from '../hooks/useDrafts';
 import { PlatformPageLayout } from '../components/layout/PlatformPageLayout';
