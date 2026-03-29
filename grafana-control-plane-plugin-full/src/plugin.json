@@ -3,7 +3,7 @@
   "id": "rody-grafanacontrol-app",
   "name": "Grafana Control Plane",
   "info": {
-    "description": "Governed drafts and conflict resolution for Grafana resources",
+    "description": "Governed drafts, publish workflows, conflict resolution, and resource governance for Grafana resources",
     "author": {
       "name": "RENCHI LI"
     },
@@ -20,8 +20,26 @@
     },
     {
       "type": "page",
+      "name": "Publish Center",
+      "path": "/a/rody-grafanacontrol-app/publish-center",
+      "addToNav": true
+    },
+    {
+      "type": "page",
       "name": "Conflict Resolve",
       "path": "/a/rody-grafanacontrol-app/conflict",
+      "addToNav": true
+    },
+    {
+      "type": "page",
+      "name": "Governance",
+      "path": "/a/rody-grafanacontrol-app/governance",
+      "addToNav": true
+    },
+    {
+      "type": "page",
+      "name": "Datasource Changes",
+      "path": "/a/rody-grafanacontrol-app/datasource-changes",
       "addToNav": true
     }
   ],

@@ -3,6 +3,8 @@ import { PluginPage } from '@grafana/runtime';
 import { Alert, Button, HorizontalGroup, Spinner, VerticalGroup } from '@grafana/ui';
 import { DraftTable } from '../components/DraftTable';
 import { useDrafts } from '../hooks/useDrafts';
+import { PlatformPageLayout } from '../components/layout/PlatformPageLayout';
+import { UnavailableState } from '../components/common/UnavailableState';
 
 export const DraftsPage: React.FC = () => {
   const { data, loading, error, reload, publish, abandon, actingDraftId } = useDrafts();
