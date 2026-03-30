@@ -23,7 +23,7 @@ data:
       }
 
       location = /api/dashboards/db {
-        limit_except GET HEAD {
+        if ($request_method !~ ^(GET|HEAD)$) {
           return 403;
         }
         proxy_pass http://{{ include "grafana-control-plane.fullname" . }}-grafana:{{ .Values.grafana.servicePort }}/api/dashboards/db;

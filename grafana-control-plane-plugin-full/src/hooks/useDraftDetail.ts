@@ -46,12 +46,11 @@ export const useDraftDetail = (draftId: number) => {
     load();
   }, [load]);
 
-  const saveDraft = useCallback(async (payload?: Partial<DraftDetail>) => {
+  const saveDraft = useCallback(async (payload?: Partial<DraftDetail>): Promise<void> => {
     setState((prev) => ({ ...prev, saving: true, error: undefined }));
     try {
       const data = await saveDraftDetail(draftId, payload ?? state.data ?? {});
       setState((prev) => ({ ...prev, data, saving: false }));
-      return data;
     } catch (error) {
       setState((prev) => ({
         ...prev,

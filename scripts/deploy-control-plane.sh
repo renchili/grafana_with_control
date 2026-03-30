@@ -65,7 +65,7 @@ fi
 
 log "building platform-api image"
 cd "$API_DIR"
-IMAGE_NAME="$IMAGE_NAME" IMAGE_TAG="$IMAGE_TAG" USE_BUILDX="${USE_BUILDX:-1}" NO_CACHE="${NO_CACHE:-0}" ./scripts/build-prod.sh
+IMAGE_NAME="$IMAGE_NAME" IMAGE_TAG="$IMAGE_TAG" USE_BUILDX="${USE_BUILDX:-1}" NO_CACHE="${NO_CACHE:-0}" bash ./scripts/build-prod.sh
 
 mkdir -p "$DEPLOY_DIR"
 cat > "$DEPLOY_DIR/.env" <<ENVEOF
