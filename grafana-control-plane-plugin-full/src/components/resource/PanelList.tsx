@@ -1,5 +1,5 @@
 import React from 'react';
-import { Button, VerticalGroup } from '@grafana/ui';
+import { Button } from '@grafana/ui';
 import { PanelDefinition } from '../../types/resource';
 
 interface Props {
@@ -10,7 +10,7 @@ interface Props {
 
 export const PanelList: React.FC<Props> = ({ panels, selectedPanelId, onSelect }) => {
   return (
-    <VerticalGroup spacing="sm">
+    <div style={{ display: 'grid', gap: 8 }}>
       {panels.map((panel) => (
         <Button
           key={panel.id}
@@ -21,6 +21,6 @@ export const PanelList: React.FC<Props> = ({ panels, selectedPanelId, onSelect }
           {panel.title || `Panel ${panel.id}`} · {panel.type}
         </Button>
       ))}
-    </VerticalGroup>
+    </div>
   );
 };
