@@ -12,17 +12,19 @@ import (
 )
 
 type Handler struct {
-	store                *store.MemoryStore
-	syntheticMu          sync.RWMutex
-	syntheticDrafts      map[int64]model.Draft
-	nextSyntheticDraftID int64
+	store                 *store.MemoryStore
+	syntheticMu           sync.RWMutex
+	syntheticDrafts       map[int64]model.Draft
+	syntheticDraftPayload map[int64]map[string]any
+	nextSyntheticDraftID  int64
 }
 
 func NewHandler(s *store.MemoryStore) *Handler {
 	return &Handler{
-		store:                s,
-		syntheticDrafts:      map[int64]model.Draft{},
-		nextSyntheticDraftID: 10000,
+		store:                 s,
+		syntheticDrafts:       map[int64]model.Draft{},
+		syntheticDraftPayload: map[int64]map[string]any{},
+		nextSyntheticDraftID:  10000,
 	}
 }
 
@@ -82,6 +84,7 @@ func (h *Handler) createDraftForResource(c *gin.Context) {
 		UpdatedAt:      time.Now().UTC().Format(time.RFC3339),
 	}
 	h.syntheticDrafts[draft.DraftID] = draft
+	h.syntheticDraftPayload[draft.DraftID] = defaultDraftPayload(draft)
 	c.JSON(http.StatusOK, gin.H{"draftId": draft.DraftID})
 }
 
@@ -95,7 +98,7 @@ func (h *Handler) getDraftDetail(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"message": "draft not found"})
 		return
 	}
-	c.JSON(http.StatusOK, buildDraftDetail(draft, nil))
+	c.JSON(http.StatusOK, buildDraftDetail(draft, h.syntheticPayloadOrDefault(draft)))
 }
 
 func (h *Handler) saveDraft(c *gin.Context) {
@@ -117,8 +120,9 @@ func (h *Handler) saveDraft(c *gin.Context) {
 		}
 	}
 
-	h.touchSyntheticDraft(id)
-	c.JSON(http.StatusOK, buildDraftDetail(draft, payload))
+	h.saveSyntheticPayload(id, draft, payload)
+	updatedDraft, _ := h.findDraftByID(id)
+	c.JSON(http.StatusOK, buildDraftDetail(updatedDraft, h.syntheticPayloadOrDefault(updatedDraft)))
 }
 
 func (h *Handler) publishDraft(c *gin.Context) {
@@ -170,7 +174,7 @@ func (h *Handler) getConflict(c *gin.Context) {
 			HasConflict:      false,
 			ConflictPaths:    []string{},
 			Base:             map[string]any{"title": draft.Title},
-			Yours:            map[string]any{"title": draft.Title},
+			Yours:            h.syntheticPayloadOrDefault(draft),
 			Theirs:           map[string]any{"title": draft.Title},
 		}
 		c.JSON(http.StatusOK, payload)
@@ -224,6 +228,11 @@ func (h *Handler) saveAsCopy(c *gin.Context) {
 		}
 		copyDraft.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 		h.syntheticDrafts[copyDraft.DraftID] = copyDraft
+		basePayload := h.syntheticDraftPayload[id]
+		if basePayload == nil {
+			basePayload = defaultDraftPayload(copyDraft)
+		}
+		h.syntheticDraftPayload[copyDraft.DraftID] = cloneMap(basePayload)
 		h.syntheticMu.Unlock()
 		c.JSON(http.StatusOK, model.ActionResponse{Success: true, Message: "draft copied", NewResourceUID: copyDraft.ResourceUID})
 		return
@@ -320,6 +329,43 @@ func (h *Handler) setSyntheticDraftStatus(id int64, status model.DraftStatus) bo
 	return true
 }
 
+func (h *Handler) saveSyntheticPayload(id int64, draft model.Draft, payload map[string]any) {
+	h.syntheticMu.Lock()
+	defer h.syntheticMu.Unlock()
+	if _, found := h.syntheticDrafts[id]; !found {
+		return
+	}
+	if payload == nil {
+		payload = defaultDraftPayload(draft)
+	}
+	h.syntheticDraftPayload[id] = payload
+	updated := h.syntheticDrafts[id]
+	if title, ok := payload["title"].(string); ok && title != "" {
+		updated.Title = title
+	}
+	updated.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	h.syntheticDrafts[id] = updated
+}
+
+func (h *Handler) syntheticPayloadOrDefault(draft model.Draft) map[string]any {
+	h.syntheticMu.RLock()
+	payload, found := h.syntheticDraftPayload[draft.DraftID]
+	h.syntheticMu.RUnlock()
+	if found && payload != nil {
+		return cloneMap(payload)
+	}
+	return defaultDraftPayload(draft)
+}
+
+func defaultDraftPayload(draft model.Draft) map[string]any {
+	return map[string]any{
+		"title": draft.Title,
+		"resourceUid": draft.ResourceUID,
+		"governanceMode": draft.GovernanceMode,
+		"panels": buildPanelsForDraft(draft),
+	}
+}
+
 func buildResourceDefinition(draft model.Draft) model.ResourceDefinition {
 	return model.ResourceDefinition{
 		UID:                draft.ResourceUID,
@@ -333,14 +379,10 @@ func buildResourceDefinition(draft model.Draft) model.ResourceDefinition {
 	}
 }
 
-func buildDraftDetail(draft model.Draft, rawDraft any) model.DraftDetail {
-	if rawDraft == nil {
-		rawDraft = map[string]any{
-			"title": draft.Title,
-			"resourceUid": draft.ResourceUID,
-			"governanceMode": draft.GovernanceMode,
-			"panels": buildPanelsForDraft(draft),
-		}
+func buildDraftDetail(draft model.Draft, rawDraft map[string]any) model.DraftDetail {
+	panels := buildPanelsForDraft(draft)
+	if rawPanels, ok := rawDraft["panels"].([]any); ok {
+		panels = panelDefinitionsFromAny(rawPanels, panels)
 	}
 	return model.DraftDetail{
 		DraftID:        draft.DraftID,
@@ -350,7 +392,7 @@ func buildDraftDetail(draft model.Draft, rawDraft any) model.DraftDetail {
 		Status:         draft.Status,
 		BaseVersionNo:  draft.BaseVersionNo,
 		GovernanceMode: draft.GovernanceMode,
-		Panels:         buildPanelsForDraft(draft),
+		Panels:         panels,
 		RawDraft:       rawDraft,
 	}
 }
@@ -430,4 +472,96 @@ func buildPanelsForDraft(draft model.Draft) []model.PanelDefinition {
 			RawModel: panelTwoRaw,
 		},
 	}
+}
+
+func panelDefinitionsFromAny(rawPanels []any, fallback []model.PanelDefinition) []model.PanelDefinition {
+	panels := make([]model.PanelDefinition, 0, len(rawPanels))
+	for index, item := range rawPanels {
+		panelMap, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		panel := model.PanelDefinition{}
+		if value, ok := panelMap["id"].(float64); ok {
+			panel.ID = int64(value)
+		} else if index < len(fallback) {
+			panel.ID = fallback[index].ID
+		}
+		if value, ok := panelMap["title"].(string); ok {
+			panel.Title = value
+		} else if index < len(fallback) {
+			panel.Title = fallback[index].Title
+		}
+		if value, ok := panelMap["type"].(string); ok {
+			panel.Type = value
+		} else if index < len(fallback) {
+			panel.Type = fallback[index].Type
+		}
+		if value, ok := panelMap["datasource"].(string); ok {
+			panel.Datasource = value
+		} else if index < len(fallback) {
+			panel.Datasource = fallback[index].Datasource
+		}
+		if value, ok := panelMap["fieldConfig"].(map[string]any); ok {
+			panel.FieldConfig = value
+		} else if index < len(fallback) {
+			panel.FieldConfig = fallback[index].FieldConfig
+		}
+		if value, ok := panelMap["options"].(map[string]any); ok {
+			panel.Options = value
+		} else if index < len(fallback) {
+			panel.Options = fallback[index].Options
+		}
+		if value, ok := panelMap["rawModel"].(map[string]any); ok {
+			panel.RawModel = value
+		} else {
+			panel.RawModel = cloneMap(panelMap)
+		}
+		if rawQueries, ok := panelMap["queries"].([]any); ok {
+			panel.Queries = make([]model.QueryDefinition, 0, len(rawQueries))
+			for _, rawQuery := range rawQueries {
+				queryMap, ok := rawQuery.(map[string]any)
+				if !ok {
+					continue
+				}
+				query := model.QueryDefinition{}
+				if value, ok := queryMap["refId"].(string); ok {
+					query.RefID = value
+				}
+				if value, ok := queryMap["datasource"].(string); ok {
+					query.Datasource = value
+				}
+				if value, ok := queryMap["expression"].(string); ok {
+					query.Expression = value
+				}
+				panel.Queries = append(panel.Queries, query)
+			}
+		} else if index < len(fallback) {
+			panel.Queries = fallback[index].Queries
+		}
+		if rawTransforms, ok := panelMap["transformations"].([]any); ok {
+			panel.Transformations = make([]map[string]any, 0, len(rawTransforms))
+			for _, rawTransform := range rawTransforms {
+				transformMap, ok := rawTransform.(map[string]any)
+				if ok {
+					panel.Transformations = append(panel.Transformations, transformMap)
+				}
+			}
+		} else if index < len(fallback) {
+			panel.Transformations = fallback[index].Transformations
+		}
+		panels = append(panels, panel)
+	}
+	if len(panels) == 0 {
+		return fallback
+	}
+	return panels
+}
+
+func cloneMap(input map[string]any) map[string]any {
+	output := make(map[string]any, len(input))
+	for key, value := range input {
+		output[key] = value
+	}
+	return output
 }

@@ -43,7 +43,7 @@ export const DraftEditorPage: React.FC = () => {
         ) : !data ? (
           <Alert title="Draft not found" severity="warning">No governed draft details were returned for {draftId}.</Alert>
         ) : (
-          <DraftPanelEditor draft={data} />
+          <DraftPanelEditor draft={data} saving={saving} onSave={saveDraft} />
         )}
       </PlatformPageLayout>
     </PluginPage>
