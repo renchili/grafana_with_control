@@ -42,10 +42,8 @@ if [[ ! -f go.mod ]]; then
   exit 1
 fi
 
-if [[ ! -f go.sum ]]; then
-  log "go.sum not found, generating it with go mod tidy"
-  go mod tidy
-fi
+log "syncing go modules"
+go mod tidy
 
 log "validating module graph"
 go mod download
