@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+PLUGIN_DIR="$ROOT_DIR/grafana-control-plane-plugin-full"
+API_DIR="$ROOT_DIR/platform-api"
+DEPLOY_DIR="$ROOT_DIR/deploy"
+
+GRAFANA_PORT="${GRAFANA_PORT:-3000}"
+GRAFANA_ADMIN_USER="${GRAFANA_ADMIN_USER:-admin}"
+GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-admin}"
+IMAGE_NAME="${IMAGE_NAME:-grafana-control-plane-platform-api}"
+IMAGE_TAG="${IMAGE_TAG:-local}"
+RUN_STACK="${RUN_STACK:-1}"
+
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "missing required command: $1" >&2
+    exit 1
+  }
+}
+
+log() {
+  printf '[deploy-control-plane] %s\n' "$*"
+}
+
+need_cmd node
+need_cmd npm
+need_cmd go
+need_cmd docker
+
+if docker compose version >/dev/null 2>&1; then
+  DOCKER_COMPOSE=(docker compose)
+elif command -v docker-compose >/dev/null 2>&1; then
+  DOCKER_COMPOSE=(docker-compose)
+else
+  echo 'missing required command: docker compose or docker-compose' >&2
+  exit 1
+fi
+
+log "building plugin frontend"
+cd "$PLUGIN_DIR"
+npm install
+npm run build
+
+if [[ ! -f "$PLUGIN_DIR/dist/module.js" ]]; then
+  echo 'plugin build did not produce dist/module.js' >&2
+  exit 1
+fi
+if [[ ! -f "$PLUGIN_DIR/dist/plugin.json" ]]; then
+  echo 'plugin build did not produce dist/plugin.json' >&2
+  exit 1
+fi
+
+log "building platform-api image"
+cd "$API_DIR"
+IMAGE_NAME="$IMAGE_NAME" IMAGE_TAG="$IMAGE_TAG" USE_BUILDX="${USE_BUILDX:-1}" NO_CACHE="${NO_CACHE:-0}" ./scripts/build-prod.sh
+
+mkdir -p "$DEPLOY_DIR"
+cat > "$DEPLOY_DIR/.env" <<ENVEOF
+GRAFANA_PORT=$GRAFANA_PORT
+GRAFANA_ADMIN_USER=$GRAFANA_ADMIN_USER
+GRAFANA_ADMIN_PASSWORD=$GRAFANA_ADMIN_PASSWORD
+PLATFORM_API_IMAGE=${IMAGE_NAME}:${IMAGE_TAG}
+ENVEOF
+
+if [[ "$RUN_STACK" == "1" ]]; then
+  log "starting gateway + grafana + platform-api"
+  cd "$DEPLOY_DIR"
+  "${DOCKER_COMPOSE[@]}" -f docker-compose.yaml up -d --build
+  log "stack started"
+  log "open http://127.0.0.1:${GRAFANA_PORT}"
+  log "login ${GRAFANA_ADMIN_USER} / ${GRAFANA_ADMIN_PASSWORD}"
+  log "health check: http://127.0.0.1:${GRAFANA_PORT}/api/platform/v1/healthz"
+else
+  log "build completed; RUN_STACK=0 so containers were not started"
+fi

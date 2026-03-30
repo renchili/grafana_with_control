@@ -3,6 +3,8 @@ package httpapi
 import (
 	"net/http"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/renchili/grafana_with_control/platform-api/internal/model"
@@ -10,16 +12,27 @@ import (
 )
 
 type Handler struct {
-	store *store.MemoryStore
+	store                *store.MemoryStore
+	syntheticMu          sync.RWMutex
+	syntheticDrafts      map[int64]model.Draft
+	nextSyntheticDraftID int64
 }
 
 func NewHandler(s *store.MemoryStore) *Handler {
-	return &Handler{store: s}
+	return &Handler{
+		store:                s,
+		syntheticDrafts:      map[int64]model.Draft{},
+		nextSyntheticDraftID: 10000,
+	}
 }
 
 func (h *Handler) Register(r gin.IRoutes) {
 	r.GET("/healthz", h.healthz)
 	r.GET("/me/drafts", h.listDrafts)
+	r.GET("/resources/:uid", h.getResourceDefinition)
+	r.POST("/resources/:uid/drafts", h.createDraftForResource)
+	r.GET("/drafts/:draftId", h.getDraftDetail)
+	r.POST("/drafts/:draftId/save", h.saveDraft)
 	r.POST("/drafts/:draftId/publish", h.publishDraft)
 	r.POST("/drafts/:draftId/abandon", h.abandonDraft)
 	r.GET("/drafts/:draftId/conflict", h.getConflict)
@@ -36,9 +49,85 @@ func (h *Handler) listDrafts(c *gin.Context) {
 	c.JSON(http.StatusOK, h.store.ListDrafts())
 }
 
+func (h *Handler) getResourceDefinition(c *gin.Context) {
+	uid := c.Param("uid")
+	draft, found := h.findDraftByUID(uid)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"message": "resource not found"})
+		return
+	}
+	c.JSON(http.StatusOK, buildResourceDefinition(draft))
+}
+
+func (h *Handler) createDraftForResource(c *gin.Context) {
+	uid := c.Param("uid")
+	if existing, found := h.findDraftByUID(uid); found {
+		c.JSON(http.StatusOK, gin.H{"draftId": existing.DraftID})
+		return
+	}
+
+	h.syntheticMu.Lock()
+	defer h.syntheticMu.Unlock()
+
+	h.nextSyntheticDraftID++
+	draft := model.Draft{
+		DraftID:        h.nextSyntheticDraftID,
+		ResourceType:   "dashboard",
+		ResourceUID:    uid,
+		Title:          "Governed Draft for " + uid,
+		OwnerName:      "platform-demo",
+		BaseVersionNo:  1,
+		GovernanceMode: "platform",
+		Status:         model.DraftStatusActive,
+		UpdatedAt:      time.Now().UTC().Format(time.RFC3339),
+	}
+	h.syntheticDrafts[draft.DraftID] = draft
+	c.JSON(http.StatusOK, gin.H{"draftId": draft.DraftID})
+}
+
+func (h *Handler) getDraftDetail(c *gin.Context) {
+	id, ok := parseDraftID(c)
+	if !ok {
+		return
+	}
+	draft, found := h.findDraftByID(id)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"message": "draft not found"})
+		return
+	}
+	c.JSON(http.StatusOK, buildDraftDetail(draft, nil))
+}
+
+func (h *Handler) saveDraft(c *gin.Context) {
+	id, ok := parseDraftID(c)
+	if !ok {
+		return
+	}
+	draft, found := h.findDraftByID(id)
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"message": "draft not found"})
+		return
+	}
+
+	var payload map[string]any
+	if c.Request.ContentLength > 0 {
+		if err := c.ShouldBindJSON(&payload); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
+			return
+		}
+	}
+
+	h.touchSyntheticDraft(id)
+	c.JSON(http.StatusOK, buildDraftDetail(draft, payload))
+}
+
 func (h *Handler) publishDraft(c *gin.Context) {
 	id, ok := parseDraftID(c)
 	if !ok {
+		return
+	}
+	if h.setSyntheticDraftStatus(id, model.DraftStatusPublished) {
+		c.JSON(http.StatusOK, model.ActionResponse{Success: true, Message: "draft published", JobID: id})
 		return
 	}
 	resp, found := h.store.PublishDraft(id)
@@ -54,6 +143,10 @@ func (h *Handler) abandonDraft(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if h.setSyntheticDraftStatus(id, model.DraftStatusAbandoned) {
+		c.JSON(http.StatusOK, model.ActionResponse{Success: true, Message: "draft abandoned"})
+		return
+	}
 	resp, found := h.store.AbandonDraft(id)
 	if !found {
 		c.JSON(http.StatusNotFound, gin.H{"message": "draft not found"})
@@ -67,6 +160,22 @@ func (h *Handler) getConflict(c *gin.Context) {
 	if !ok {
 		return
 	}
+	if draft, found := h.getSyntheticDraft(id); found {
+		payload := model.ConflictPayload{
+			DraftID:          draft.DraftID,
+			ResourceUID:      draft.ResourceUID,
+			ResourceType:     draft.ResourceType,
+			BaseVersionNo:    draft.BaseVersionNo,
+			CurrentVersionNo: draft.BaseVersionNo,
+			HasConflict:      false,
+			ConflictPaths:    []string{},
+			Base:             map[string]any{"title": draft.Title},
+			Yours:            map[string]any{"title": draft.Title},
+			Theirs:           map[string]any{"title": draft.Title},
+		}
+		c.JSON(http.StatusOK, payload)
+		return
+	}
 	payload, found := h.store.GetConflict(id)
 	if !found {
 		c.JSON(http.StatusNotFound, gin.H{"message": "conflict data not found"})
@@ -78,6 +187,10 @@ func (h *Handler) getConflict(c *gin.Context) {
 func (h *Handler) rebaseDraft(c *gin.Context) {
 	id, ok := parseDraftID(c)
 	if !ok {
+		return
+	}
+	if h.touchSyntheticDraft(id) {
+		c.JSON(http.StatusOK, model.ActionResponse{Success: true, Message: "draft rebased"})
 		return
 	}
 	resp, found := h.store.RebaseDraft(id)
@@ -98,6 +211,23 @@ func (h *Handler) saveAsCopy(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"message": err.Error()})
 		return
 	}
+	if draft, found := h.getSyntheticDraft(id); found {
+		h.syntheticMu.Lock()
+		h.nextSyntheticDraftID++
+		copyDraft := draft
+		copyDraft.DraftID = h.nextSyntheticDraftID
+		if req.Title != "" {
+			copyDraft.Title = req.Title
+		}
+		if req.UID != "" {
+			copyDraft.ResourceUID = req.UID
+		}
+		copyDraft.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+		h.syntheticDrafts[copyDraft.DraftID] = copyDraft
+		h.syntheticMu.Unlock()
+		c.JSON(http.StatusOK, model.ActionResponse{Success: true, Message: "draft copied", NewResourceUID: copyDraft.ResourceUID})
+		return
+	}
 	resp, found := h.store.SaveAsCopy(id, req)
 	if !found {
 		c.JSON(http.StatusNotFound, gin.H{"message": "draft not found"})
@@ -109,6 +239,10 @@ func (h *Handler) saveAsCopy(c *gin.Context) {
 func (h *Handler) takeoverDraft(c *gin.Context) {
 	id, ok := parseDraftID(c)
 	if !ok {
+		return
+	}
+	if h.touchSyntheticDraft(id) {
+		c.JSON(http.StatusOK, model.ActionResponse{Success: true, Message: "draft takeover accepted"})
 		return
 	}
 	resp, found := h.store.TakeoverDraft(id)
@@ -126,4 +260,174 @@ func parseDraftID(c *gin.Context) (int64, bool) {
 		return 0, false
 	}
 	return id, true
+}
+
+func (h *Handler) findDraftByUID(uid string) (model.Draft, bool) {
+	for _, draft := range h.store.ListDrafts() {
+		if draft.ResourceUID == uid {
+			return draft, true
+		}
+	}
+
+	h.syntheticMu.RLock()
+	defer h.syntheticMu.RUnlock()
+	for _, draft := range h.syntheticDrafts {
+		if draft.ResourceUID == uid {
+			return draft, true
+		}
+	}
+	return model.Draft{}, false
+}
+
+func (h *Handler) findDraftByID(id int64) (model.Draft, bool) {
+	for _, draft := range h.store.ListDrafts() {
+		if draft.DraftID == id {
+			return draft, true
+		}
+	}
+	return h.getSyntheticDraft(id)
+}
+
+func (h *Handler) getSyntheticDraft(id int64) (model.Draft, bool) {
+	h.syntheticMu.RLock()
+	defer h.syntheticMu.RUnlock()
+	draft, found := h.syntheticDrafts[id]
+	return draft, found
+}
+
+func (h *Handler) touchSyntheticDraft(id int64) bool {
+	h.syntheticMu.Lock()
+	defer h.syntheticMu.Unlock()
+	draft, found := h.syntheticDrafts[id]
+	if !found {
+		return false
+	}
+	draft.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	h.syntheticDrafts[id] = draft
+	return true
+}
+
+func (h *Handler) setSyntheticDraftStatus(id int64, status model.DraftStatus) bool {
+	h.syntheticMu.Lock()
+	defer h.syntheticMu.Unlock()
+	draft, found := h.syntheticDrafts[id]
+	if !found {
+		return false
+	}
+	draft.Status = status
+	draft.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	h.syntheticDrafts[id] = draft
+	return true
+}
+
+func buildResourceDefinition(draft model.Draft) model.ResourceDefinition {
+	return model.ResourceDefinition{
+		UID:                draft.ResourceUID,
+		Title:              draft.Title,
+		OwnerName:          draft.OwnerName,
+		GovernanceMode:     draft.GovernanceMode,
+		PublishedVersionNo: draft.BaseVersionNo,
+		HasDraft:           true,
+		DraftID:            draft.DraftID,
+		Panels:             buildPanelsForDraft(draft),
+	}
+}
+
+func buildDraftDetail(draft model.Draft, rawDraft any) model.DraftDetail {
+	if rawDraft == nil {
+		rawDraft = map[string]any{
+			"title": draft.Title,
+			"resourceUid": draft.ResourceUID,
+			"governanceMode": draft.GovernanceMode,
+			"panels": buildPanelsForDraft(draft),
+		}
+	}
+	return model.DraftDetail{
+		DraftID:        draft.DraftID,
+		ResourceUID:    draft.ResourceUID,
+		Title:          draft.Title,
+		OwnerName:      draft.OwnerName,
+		Status:         draft.Status,
+		BaseVersionNo:  draft.BaseVersionNo,
+		GovernanceMode: draft.GovernanceMode,
+		Panels:         buildPanelsForDraft(draft),
+		RawDraft:       rawDraft,
+	}
+}
+
+func buildPanelsForDraft(draft model.Draft) []model.PanelDefinition {
+	panelOneRaw := map[string]any{
+		"id": 1,
+		"title": draft.Title + " / latency",
+		"type": "timeseries",
+		"targets": []map[string]any{{
+			"refId": "A",
+			"datasource": map[string]any{"type": "prometheus", "uid": "grafana"},
+			"expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{dashboard_uid=\"" + draft.ResourceUID + "\"}[5m])) by (le))",
+		}},
+		"fieldConfig": map[string]any{
+			"defaults": map[string]any{
+				"unit": "s",
+				"thresholds": map[string]any{
+					"mode": "absolute",
+					"steps": []map[string]any{{"color": "green", "value": nil}, {"color": "red", "value": 1.5}},
+				},
+			},
+		},
+	}
+
+	panelTwoRaw := map[string]any{
+		"id": 2,
+		"title": draft.Title + " / deploy audit",
+		"type": "table",
+		"targets": []map[string]any{{
+			"refId": "A",
+			"datasource": map[string]any{"type": "mysql", "uid": "grafana"},
+			"rawSql": "select updated_at, status, owner from governed_drafts where resource_uid = '" + draft.ResourceUID + "' order by updated_at desc limit 20",
+		}},
+		"transformations": []map[string]any{{
+			"id": "organize",
+			"options": map[string]any{"renameByName": map[string]any{"updated_at": "updatedAt"}},
+		}},
+	}
+
+	return []model.PanelDefinition{
+		{
+			ID:         1,
+			Title:      draft.Title + " / latency",
+			Type:       "timeseries",
+			Datasource: "prometheus",
+			Queries: []model.QueryDefinition{{
+				RefID:      "A",
+				Datasource: "prometheus",
+				Expression: "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{dashboard_uid=\"" + draft.ResourceUID + "\"}[5m])) by (le))",
+			}},
+			Transformations: []map[string]any{},
+			FieldConfig: map[string]any{
+				"defaults": map[string]any{"unit": "s"},
+			},
+			Options:  map[string]any{"legend": map[string]any{"displayMode": "list"}},
+			RawModel: panelOneRaw,
+		},
+		{
+			ID:         2,
+			Title:      draft.Title + " / deploy audit",
+			Type:       "table",
+			Datasource: "mysql",
+			Queries: []model.QueryDefinition{{
+				RefID:      "A",
+				Datasource: "mysql",
+				Expression: "select updated_at, status, owner from governed_drafts where resource_uid = '" + draft.ResourceUID + "' order by updated_at desc limit 20",
+			}},
+			Transformations: []map[string]any{{
+				"id": "organize",
+				"options": map[string]any{"renameByName": map[string]any{"updated_at": "updatedAt"}},
+			}},
+			FieldConfig: map[string]any{
+				"defaults": map[string]any{"custom": map[string]any{"align": "auto"}},
+			},
+			Options:  map[string]any{"showHeader": true},
+			RawModel: panelTwoRaw,
+		},
+	}
 }
