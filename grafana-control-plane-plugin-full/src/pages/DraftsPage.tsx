@@ -1,6 +1,6 @@
 import React from 'react';
 import { PluginPage } from '@grafana/runtime';
-import { Button, Spinner, VerticalGroup } from '@grafana/ui';
+import { Button, Spinner } from '@grafana/ui';
 import { DraftTable } from '../components/DraftTable';
 import { useDrafts } from '../hooks/useDrafts';
 import { PlatformPageLayout } from '../components/layout/PlatformPageLayout';
@@ -16,7 +16,7 @@ export const DraftsPage: React.FC = () => {
         description="Resume, publish, or resolve governed drafts."
         actions={<Button variant="secondary" onClick={() => reload()}>Refresh</Button>}
       >
-        <VerticalGroup spacing="md">
+        <div style={{ display: 'grid', gap: 16 }}>
           {loading ? (
             <div style={{ padding: 40, textAlign: 'center' }}><Spinner size={32} /></div>
           ) : error ? (
@@ -29,7 +29,7 @@ export const DraftsPage: React.FC = () => {
           ) : (
             <DraftTable data={data} actingDraftId={actingDraftId} onPublish={publish} onAbandon={abandon} />
           )}
-        </VerticalGroup>
+        </div>
       </PlatformPageLayout>
     </PluginPage>
   );

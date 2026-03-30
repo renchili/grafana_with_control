@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Button, HorizontalGroup, TextArea, VerticalGroup } from '@grafana/ui';
+import { Alert, Button, HorizontalGroup, TextArea } from '@grafana/ui';
 import { DraftDetail } from '../../types/resource';
 
 interface Props {
@@ -128,7 +128,7 @@ export const DraftPanelEditor: React.FC<Props> = ({ draft, saving = false, onSav
       <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 16, alignItems: 'start' }}>
         <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, background: 'var(--panel-bg)', padding: 12 }}>
           <div style={{ fontWeight: 600, marginBottom: 12 }}>Panels</div>
-          <VerticalGroup spacing="sm">
+          <div style={{ display: 'grid', gap: 8 }}>
             {panels.map((panel, index) => (
               <Button
                 key={panel.id}
@@ -139,7 +139,7 @@ export const DraftPanelEditor: React.FC<Props> = ({ draft, saving = false, onSav
                 {panel.title || `Panel ${panel.id}`} · {panel.type}
               </Button>
             ))}
-          </VerticalGroup>
+          </div>
         </div>
 
         <div style={{ display: 'grid', gap: 16 }}>
@@ -160,7 +160,7 @@ export const DraftPanelEditor: React.FC<Props> = ({ draft, saving = false, onSav
           {error && <Alert title="Cannot save panel draft" severity="warning">{error}</Alert>}
 
           <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, background: 'var(--panel-bg)', padding: 16 }}>
-            <VerticalGroup spacing="md">
+            <div style={{ display: 'grid', gap: 16 }}>
               <TextArea
                 value={title}
                 onChange={(event) => setTitle(event.currentTarget.value)}
@@ -185,7 +185,7 @@ export const DraftPanelEditor: React.FC<Props> = ({ draft, saving = false, onSav
                 rows={14}
                 placeholder="Panel raw JSON"
               />
-            </VerticalGroup>
+            </div>
           </div>
 
           <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, background: 'var(--panel-bg)', padding: 16 }}>

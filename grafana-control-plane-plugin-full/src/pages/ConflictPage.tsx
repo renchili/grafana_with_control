@@ -1,6 +1,6 @@
 import React from 'react';
 import { PluginPage, locationService } from '@grafana/runtime';
-import { Button, Spinner, VerticalGroup } from '@grafana/ui';
+import { Button, Spinner } from '@grafana/ui';
 import { useConflict } from '../hooks/useConflict';
 import { ConflictMetaBar } from '../components/ConflictMetaBar';
 import { ConflictDiffColumns } from '../components/ConflictDiffColumns';
@@ -25,7 +25,7 @@ export const ConflictPage: React.FC = () => {
         description="Resolve version mismatch without losing your draft."
         actions={<Button variant="secondary" onClick={() => reload()}>Refresh</Button>}
       >
-        <VerticalGroup spacing="md">
+        <div style={{ display: 'grid', gap: 16 }}>
           {loading && <div style={{ padding: 40, textAlign: 'center' }}><Spinner size={32} /></div>}
 
           {!loading && error && (
@@ -55,7 +55,7 @@ export const ConflictPage: React.FC = () => {
               />
             </>
           )}
-        </VerticalGroup>
+        </div>
       </PlatformPageLayout>
     </PluginPage>
   );
