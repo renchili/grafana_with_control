@@ -16,6 +16,7 @@ MYSQL_DATABASE="${MYSQL_DATABASE:-grafana_control_plane}"
 MYSQL_USER="${MYSQL_USER:-platform}"
 MYSQL_PASSWORD="${MYSQL_PASSWORD:-platform}"
 RUN_STACK="${RUN_STACK:-1}"
+FORCE_PLUGIN_BUILD="${FORCE_PLUGIN_BUILD:-0}"
 
 need_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -42,10 +43,20 @@ else
   exit 1
 fi
 
-log "building plugin frontend"
+log "checking plugin build cache"
 cd "$PLUGIN_DIR"
-npm install
-npm run build
+
+if [[ "$FORCE_PLUGIN_BUILD" == "1" ]]; then
+  log "force rebuilding plugin"
+  npm install
+  npm run build
+elif [[ ! -f "dist/module.js" || ! -f "dist/plugin.json" ]]; then
+  log "dist missing, building plugin"
+  npm install
+  npm run build
+else
+  log "plugin already built, skip"
+fi
 
 if [[ ! -f "$PLUGIN_DIR/dist/module.js" || ! -f "$PLUGIN_DIR/dist/plugin.json" ]]; then
   echo 'plugin build did not produce dist assets' >&2
