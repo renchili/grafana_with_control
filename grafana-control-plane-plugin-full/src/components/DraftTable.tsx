@@ -42,8 +42,11 @@ export const DraftTable: React.FC<Props> = ({ data, actingDraftId, onPublish, on
                 <td style={{ padding: 12 }}>{draft.updatedAt}</td>
                 <td style={{ padding: 12 }}>
                   <HorizontalGroup spacing="sm">
-                    <Button size="sm" variant="secondary" onClick={() => locationService.push(`/d/${draft.resourceUid}`)}>
+                    <Button size="sm" variant="secondary" onClick={() => locationService.push(`/a/rody-grafanacontrol-app/draft/${draft.draftId}`)}>
                       Resume
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={() => locationService.push(`/a/rody-grafanacontrol-app/resource/${draft.resourceUid}`)}>
+                      View definition
                     </Button>
                     {draft.status === 'conflict' ? (
                       <Button size="sm" onClick={() => locationService.push(`/a/rody-grafanacontrol-app/conflict?draftId=${draft.draftId}`)}>
