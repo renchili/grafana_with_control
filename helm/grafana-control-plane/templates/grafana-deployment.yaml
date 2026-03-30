@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "grafana-control-plane.fullname" . }}-grafana
+  namespace: {{ include "grafana-control-plane.namespace" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "grafana-control-plane.fullname" . }}-grafana
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "grafana-control-plane.fullname" . }}-grafana
+    spec:
+      containers:
+        - name: grafana
+          image: {{ .Values.images.grafana }}
+          ports:
+            - containerPort: {{ .Values.grafana.servicePort }}
+          env:
+            - name: GF_SERVER_HTTP_PORT
+              value: {{ .Values.grafana.servicePort | quote }}
+            - name: GF_SECURITY_ADMIN_USER
+              value: {{ .Values.grafana.adminUser | quote }}
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: {{ .Values.grafana.adminPassword | quote }}
+            - name: GF_DEFAULT_APP_MODE
+              value: development
+            - name: GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS
+              value: {{ .Values.grafana.pluginId | quote }}
+          volumeMounts:
+            - name: grafana-storage
+              mountPath: /var/lib/grafana
+            - name: grafana-provisioning
+              mountPath: /etc/grafana/provisioning/plugins/control-plane-app.yaml
+              subPath: control-plane-app.yaml
+      volumes:
+        - name: grafana-storage
+          persistentVolumeClaim:
+            claimName: {{ include "grafana-control-plane.fullname" . }}-grafana-pvc
+        - name: grafana-provisioning
+          configMap:
+            name: {{ include "grafana-control-plane.fullname" . }}-grafana-provisioning

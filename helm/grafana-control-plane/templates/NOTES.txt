@@ -1,0 +1,8 @@
+1. Get the application URL by running these commands:
+{{- if contains "NodePort" .Values.service.type }}
+  export NODE_PORT=$(kubectl get --namespace {{ include "grafana-control-plane.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "grafana-control-plane.fullname" . }}-gateway)
+  export NODE_IP=$(kubectl get nodes --namespace {{ include "grafana-control-plane.namespace" . }} -o jsonpath="{.items[0].status.addresses[0].address}")
+  echo http://$NODE_IP:$NODE_PORT
+{{- else }}
+  kubectl port-forward svc/{{ include "grafana-control-plane.fullname" . }}-gateway 3000:{{ .Values.service.port }} -n {{ include "grafana-control-plane.namespace" . }}
+{{- end }}
