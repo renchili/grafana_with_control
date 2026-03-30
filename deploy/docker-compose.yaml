@@ -22,10 +22,35 @@ services:
       - ../grafana-control-plane-plugin-full:/var/lib/grafana/plugins/rody-grafanacontrol-app
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
 
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-grafana_control_plane}
+      MYSQL_USER: ${MYSQL_USER:-platform}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-platform}
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD:-root}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+
   platform-api:
     image: ${PLATFORM_API_IMAGE:-grafana-control-plane-platform-api:local}
+    depends_on:
+      mysql:
+        condition: service_healthy
     environment:
       PORT: 8081
+      DATABASE_DSN: ${DATABASE_DSN:-platform:platform@tcp(mysql:3306)/grafana_control_plane?parseTime=true}
+      GRAFANA_URL: ${GRAFANA_URL:-http://grafana:3000}
+      GRAFANA_BASIC_USER: ${GRAFANA_BASIC_USER:-admin}
+      GRAFANA_BASIC_PASSWORD: ${GRAFANA_BASIC_PASSWORD:-admin}
 
 volumes:
   grafana-storage:
+  mysql-data:

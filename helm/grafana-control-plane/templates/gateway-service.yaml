@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "grafana-control-plane.fullname" . }}-gateway
+  namespace: {{ include "grafana-control-plane.namespace" . }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    app.kubernetes.io/name: {{ include "grafana-control-plane.fullname" . }}-gateway
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: 80
+      protocol: TCP
+      name: http

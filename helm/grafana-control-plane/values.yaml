@@ -1,0 +1,44 @@
+nameOverride: ""
+fullnameOverride: ""
+
+namespaceOverride: ""
+
+images:
+  gateway: nginx:1.27-alpine
+  grafana: grafana/grafana:latest
+  platformApi: grafana-control-plane-platform-api:local
+  mysql: mysql:8.4
+
+service:
+  type: ClusterIP
+  port: 80
+
+grafana:
+  adminUser: admin
+  adminPassword: admin
+  pluginId: rody-grafanacontrol-app
+  servicePort: 3000
+  persistence:
+    enabled: true
+    size: 5Gi
+
+platformApi:
+  servicePort: 8081
+  grafanaUrl: http://{{ include "grafana-control-plane.fullname" . }}-grafana:3000
+  grafanaBasicUser: admin
+  grafanaBasicPassword: admin
+
+mysql:
+  database: grafana_control_plane
+  user: platform
+  password: platform
+  rootPassword: root
+  servicePort: 3306
+  persistence:
+    enabled: true
+    size: 5Gi
+
+resources: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}

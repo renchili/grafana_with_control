@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "grafana-control-plane.fullname" . }}-platform-api
+  namespace: {{ include "grafana-control-plane.namespace" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "grafana-control-plane.fullname" . }}-platform-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "grafana-control-plane.fullname" . }}-platform-api
+    spec:
+      containers:
+        - name: platform-api
+          image: {{ .Values.images.platformApi }}
+          ports:
+            - containerPort: {{ .Values.platformApi.servicePort }}
+          env:
+            - name: PORT
+              value: {{ .Values.platformApi.servicePort | quote }}
+            - name: DATABASE_DSN
+              value: {{ printf "%s:%s@tcp(%s-mysql:%d)/%s?parseTime=true" .Values.mysql.user .Values.mysql.password (include "grafana-control-plane.fullname" .) (.Values.mysql.servicePort | int) .Values.mysql.database | quote }}
+            - name: GRAFANA_URL
+              value: {{ printf "http://%s-grafana:%d" (include "grafana-control-plane.fullname" .) (.Values.grafana.servicePort | int) | quote }}
+            - name: GRAFANA_BASIC_USER
+              value: {{ .Values.platformApi.grafanaBasicUser | quote }}
+            - name: GRAFANA_BASIC_PASSWORD
+              value: {{ .Values.platformApi.grafanaBasicPassword | quote }}

@@ -11,6 +11,10 @@ GRAFANA_ADMIN_USER="${GRAFANA_ADMIN_USER:-admin}"
 GRAFANA_ADMIN_PASSWORD="${GRAFANA_ADMIN_PASSWORD:-admin}"
 IMAGE_NAME="${IMAGE_NAME:-grafana-control-plane-platform-api}"
 IMAGE_TAG="${IMAGE_TAG:-local}"
+MYSQL_ROOT_PASSWORD="${MYSQL_ROOT_PASSWORD:-root}"
+MYSQL_DATABASE="${MYSQL_DATABASE:-grafana_control_plane}"
+MYSQL_USER="${MYSQL_USER:-platform}"
+MYSQL_PASSWORD="${MYSQL_PASSWORD:-platform}"
 RUN_STACK="${RUN_STACK:-1}"
 
 need_cmd() {
@@ -43,12 +47,8 @@ cd "$PLUGIN_DIR"
 npm install
 npm run build
 
-if [[ ! -f "$PLUGIN_DIR/dist/module.js" ]]; then
-  echo 'plugin build did not produce dist/module.js' >&2
-  exit 1
-fi
-if [[ ! -f "$PLUGIN_DIR/dist/plugin.json" ]]; then
-  echo 'plugin build did not produce dist/plugin.json' >&2
+if [[ ! -f "$PLUGIN_DIR/dist/module.js" || ! -f "$PLUGIN_DIR/dist/plugin.json" ]]; then
+  echo 'plugin build did not produce dist assets' >&2
   exit 1
 fi
 
@@ -62,10 +62,15 @@ GRAFANA_PORT=$GRAFANA_PORT
 GRAFANA_ADMIN_USER=$GRAFANA_ADMIN_USER
 GRAFANA_ADMIN_PASSWORD=$GRAFANA_ADMIN_PASSWORD
 PLATFORM_API_IMAGE=${IMAGE_NAME}:${IMAGE_TAG}
+MYSQL_ROOT_PASSWORD=$MYSQL_ROOT_PASSWORD
+MYSQL_DATABASE=$MYSQL_DATABASE
+MYSQL_USER=$MYSQL_USER
+MYSQL_PASSWORD=$MYSQL_PASSWORD
+DATABASE_DSN=${MYSQL_USER}:${MYSQL_PASSWORD}@tcp(mysql:3306)/${MYSQL_DATABASE}?parseTime=true
 ENVEOF
 
 if [[ "$RUN_STACK" == "1" ]]; then
-  log "starting gateway + grafana + platform-api"
+  log "starting gateway + grafana + platform-api + mysql"
   cd "$DEPLOY_DIR"
   "${DOCKER_COMPOSE[@]}" -f docker-compose.yaml up -d --build
   log "stack started"
