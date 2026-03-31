@@ -27,8 +27,8 @@
     },
     {
       "type": "page",
-      "name": "Resource",
-      "path": "/a/rody-grafanacontrolplane-app/resource/demo-dashboard",
+      "name": "Publish Center",
+      "path": "/a/rody-grafanacontrolplane-app/publish-center",
       "addToNav": true
     }
   ],

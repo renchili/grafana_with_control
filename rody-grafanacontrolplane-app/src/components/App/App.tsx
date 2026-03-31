@@ -1,8 +1,10 @@
 import React from 'react';
 import { locationService } from '@grafana/runtime';
 import { DraftsPage } from '../../pages/DraftsPage';
-import { ResourceReadonlyPage } from '../../pages/ResourceReadonlyPage';
-import { DraftEditorPage } from '../../pages/DraftEditorPage';
+import { PublishCenterPage } from '../../pages/PublishCenterPage';
+import { ConflictResolvePage } from '../../pages/ConflictResolvePage';
+import { GovernancePage } from '../../pages/GovernancePage';
+import { DatasourceChangesPage } from '../../pages/DatasourceChangesPage';
 
 type AppProps = {
   path?: string;
@@ -10,22 +12,37 @@ type AppProps = {
 
 const navItems = [
   { label: 'Drafts', path: '/a/rody-grafanacontrolplane-app/drafts' },
-  { label: 'Resource', path: '/a/rody-grafanacontrolplane-app/resource/cpu-overview' },
+  { label: 'Publish Center', path: '/a/rody-grafanacontrolplane-app/publish-center' },
+  { label: 'Conflict Resolve', path: '/a/rody-grafanacontrolplane-app/conflict-resolve' },
+  { label: 'Governance', path: '/a/rody-grafanacontrolplane-app/governance' },
+  { label: 'Datasource Changes', path: '/a/rody-grafanacontrolplane-app/datasource-changes' },
 ];
 
 export const App = ({ path = '/a/rody-grafanacontrolplane-app/drafts' }: AppProps) => {
   const normalizedPath = path.replace(/\/+$/, '') || '/a/rody-grafanacontrolplane-app';
-  const isResource = normalizedPath.includes('/resource/');
-  const isDraft = normalizedPath.includes('/draft/');
-  const uid = isResource ? normalizedPath.split('/resource/')[1] || 'cpu-overview' : 'cpu-overview';
-  const draftId = isDraft ? normalizedPath.split('/draft/')[1] || '0' : '0';
+
+  const renderPage = () => {
+    if (normalizedPath.includes('/publish-center')) {
+      return <PublishCenterPage />;
+    }
+    if (normalizedPath.includes('/conflict-resolve')) {
+      return <ConflictResolvePage />;
+    }
+    if (normalizedPath.includes('/governance')) {
+      return <GovernancePage />;
+    }
+    if (normalizedPath.includes('/datasource-changes')) {
+      return <DatasourceChangesPage />;
+    }
+    return <DraftsPage />;
+  };
 
   return (
     <div style={{ padding: 20, display: 'grid', gap: 16 }}>
       <div>
         <h2 style={{ margin: 0 }}>Grafana Control Plane</h2>
-        <div style={{ color: 'var(--text-secondary)' }}>
-          Governed drafts and controlled publish workflow
+        <div style={{ color: 'var(--text-secondary)', marginTop: 4 }}>
+          Grafana = Data Plane · Platform = Control Plane
         </div>
       </div>
 
@@ -62,7 +79,7 @@ export const App = ({ path = '/a/rody-grafanacontrolplane-app/drafts' }: AppProp
         })}
       </div>
 
-      {isDraft ? <DraftEditorPage draftId={draftId} /> : isResource ? <ResourceReadonlyPage uid={uid} /> : <DraftsPage />}
+      {renderPage()}
     </div>
   );
 };
