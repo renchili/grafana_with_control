@@ -34,6 +34,7 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
   const [publishing, setPublishing] = useState(false);
   const [abandoning, setAbandoning] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [rawDraftText, setRawDraftText] = useState('');
 
   const load = async () => {
@@ -55,9 +56,20 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
     }
   };
 
+  const formatJson = () => {
+    try {
+      const parsed = rawDraftText ? JSON.parse(rawDraftText) : {};
+      setRawDraftText(JSON.stringify(parsed, null, 2));
+      setError('');
+    } catch (e) {
+      setError('Invalid JSON in draft payload');
+    }
+  };
+
   const saveDraft = async () => {
     setSaving(true);
     setError('');
+    setNotice('');
     try {
       let payload: Record<string, unknown> = {};
       try {
@@ -76,6 +88,7 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
       const json = await resp.json();
       setData(json);
       setRawDraftText(JSON.stringify(json.rawDraft ?? {}, null, 2));
+      setNotice('Draft saved successfully');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save draft');
     } finally {
@@ -86,6 +99,7 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
   const publishDraft = async () => {
     setPublishing(true);
     setError('');
+    setNotice('');
     try {
       const resp = await fetch(`/api/platform/v1/drafts/${draftId}/publish`, {
         method: 'POST',
@@ -93,6 +107,7 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
       if (!resp.ok) {
         throw new Error(`HTTP ${resp.status}`);
       }
+      setNotice('Draft published successfully');
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to publish draft');
@@ -104,6 +119,7 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
   const abandonDraft = async () => {
     setAbandoning(true);
     setError('');
+    setNotice('');
     try {
       const resp = await fetch(`/api/platform/v1/drafts/${draftId}/abandon`, {
         method: 'POST',
@@ -111,6 +127,7 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
       if (!resp.ok) {
         throw new Error(`HTTP ${resp.status}`);
       }
+      setNotice('Draft abandoned successfully');
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to abandon draft');
@@ -138,6 +155,9 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
         <button type="button" onClick={() => void load()} style={{ padding: '8px 12px', cursor: 'pointer' }}>
           Refresh
         </button>
+        <button type="button" onClick={() => void formatJson()} style={{ padding: '8px 12px', cursor: 'pointer' }}>
+          Format JSON
+        </button>
         <button type="button" onClick={() => void saveDraft()} style={{ padding: '8px 12px', cursor: 'pointer' }} disabled={saving}>
           {saving ? 'Saving...' : 'Save'}
         </button>
@@ -149,11 +169,17 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
         </button>
       </div>
 
+      {notice && (
+        <div style={{ border: '1px solid #299c46', borderRadius: 8, padding: 12, color: '#299c46' }}>
+          {notice}
+        </div>
+      )}
+
       {loading && <div>Loading draft…</div>}
 
       {!loading && error && (
         <div style={{ border: '1px solid #d44a3a', borderRadius: 8, padding: 12 }}>
-          Failed to load draft: {error}
+          {error}
         </div>
       )}
 

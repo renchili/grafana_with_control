@@ -11,10 +11,24 @@ type Draft = {
   updatedAt: string;
 };
 
+const statusColor = (status: string) => {
+  switch (status) {
+    case 'published':
+      return '#299c46';
+    case 'conflict':
+      return '#d44a3a';
+    case 'abandoned':
+      return '#ff9830';
+    default:
+      return '#3274d9';
+  }
+};
+
 export const DraftsPage: React.FC = () => {
   const [data, setData] = useState<Draft[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [actioningId, setActioningId] = useState<number | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -30,6 +44,42 @@ export const DraftsPage: React.FC = () => {
       setError(e instanceof Error ? e.message : 'Failed to load drafts');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const publishDraft = async (draftId: number) => {
+    setActioningId(draftId);
+    setError('');
+    try {
+      const resp = await fetch(`/api/platform/v1/drafts/${draftId}/publish`, {
+        method: 'POST',
+      });
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to publish draft');
+    } finally {
+      setActioningId(null);
+    }
+  };
+
+  const abandonDraft = async (draftId: number) => {
+    setActioningId(draftId);
+    setError('');
+    try {
+      const resp = await fetch(`/api/platform/v1/drafts/${draftId}/abandon`, {
+        method: 'POST',
+      });
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to abandon draft');
+    } finally {
+      setActioningId(null);
     }
   };
 
@@ -63,7 +113,7 @@ export const DraftsPage: React.FC = () => {
 
       {!loading && error && (
         <div style={{ border: '1px solid #d44a3a', borderRadius: 8, padding: 12 }}>
-          Failed to load drafts: {error}
+          {error}
         </div>
       )}
 
@@ -96,7 +146,20 @@ export const DraftsPage: React.FC = () => {
                   </td>
                   <td style={{ padding: 12 }}>{draft.ownerName}</td>
                   <td style={{ padding: 12 }}>v{draft.baseVersionNo}</td>
-                  <td style={{ padding: 12 }}>{draft.status}</td>
+                  <td style={{ padding: 12 }}>
+                    <span
+                      style={{
+                        display: 'inline-block',
+                        padding: '2px 8px',
+                        borderRadius: 9999,
+                        color: '#fff',
+                        background: statusColor(draft.status),
+                        fontSize: 12,
+                      }}
+                    >
+                      {draft.status}
+                    </span>
+                  </td>
                   <td style={{ padding: 12 }}>{draft.updatedAt}</td>
                   <td style={{ padding: 12 }}>
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -117,6 +180,22 @@ export const DraftsPage: React.FC = () => {
                         }
                       >
                         View definition
+                      </button>
+                      <button
+                        type="button"
+                        style={{ padding: '6px 10px', cursor: 'pointer' }}
+                        onClick={() => void publishDraft(draft.draftId)}
+                        disabled={actioningId === draft.draftId}
+                      >
+                        Publish
+                      </button>
+                      <button
+                        type="button"
+                        style={{ padding: '6px 10px', cursor: 'pointer' }}
+                        onClick={() => void abandonDraft(draft.draftId)}
+                        disabled={actioningId === draft.draftId}
+                      >
+                        Abandon
                       </button>
                     </div>
                   </td>
