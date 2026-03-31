@@ -133,6 +133,7 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
   const [notice, setNotice] = useState('');
   const [rawDraftText, setRawDraftText] = useState('');
   const [rows, setRows] = useState<LayoutRow[]>([]);
+  const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 900 : false);
 
   const syncJsonFromRows = (nextRows: LayoutRow[], nextData?: DraftDetail | null, currentRawText?: string) => {
     const sourceData = nextData ?? data;
@@ -196,7 +197,7 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
       };
       const extracted = extractRows(merged);
       setRows(extracted);
-      setNotice('Layout canvas synced from JSON');
+      setNotice('Layout editor synced from JSON');
       setError('');
     } catch {
       setError('Invalid JSON in draft payload');
@@ -303,6 +304,12 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
     void load();
   }, [draftId]);
 
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 900);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const gridLayout = useMemo<Layout[]>(
     () =>
       rows.map((row) => ({
@@ -316,6 +323,14 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
       })),
     [rows]
   );
+
+  const previewHeight = useMemo(() => {
+    if (rows.length === 0) {
+      return 240;
+    }
+    const maxBottom = Math.max(...rows.map((row) => row.y + row.h));
+    return Math.max(maxBottom * 24, 240);
+  }, [rows]);
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
@@ -354,7 +369,7 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
           Format JSON
         </button>
         <button type="button" onClick={syncRowsFromJson} style={{ padding: '8px 12px', cursor: 'pointer' }}>
-          Sync Canvas From JSON
+          Sync Editor From JSON
         </button>
         <button type="button" onClick={() => void saveDraft()} style={{ padding: '8px 12px', cursor: 'pointer' }} disabled={saving}>
           {saving ? 'Saving...' : 'Save'}
@@ -383,68 +398,78 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
 
       {!loading && data && (
         <>
-          <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16 }}>
-            <div style={{ fontWeight: 600, marginBottom: 12 }}>Layout Canvas</div>
-            <div style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
-              Drag panels to move them. Drag the bottom-right handle to resize. Changes sync into the draft JSON automatically.
-            </div>
+          {!isMobile && (
+            <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16 }}>
+              <div style={{ fontWeight: 600, marginBottom: 12 }}>Layout Canvas</div>
+              <div style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
+                Desktop mode: drag panels to move them and use the bottom-right handle to resize. Changes sync into draft JSON automatically.
+              </div>
 
-            <div style={{ overflowX: 'auto' }}>
-              <div style={{ minWidth: 960 }}>
-                <GridLayout
-                  className="layout-canvas"
-                  layout={gridLayout}
-                  cols={24}
-                  rowHeight={30}
-                  width={960}
-                  margin={[12, 12]}
-                  containerPadding={[0, 0]}
-                  isDraggable
-                  isResizable
-                  onLayoutChange={onLayoutChange}
-                >
-                  {rows.map((row) => (
-                    <div key={String(row.id)}>
-                      <div
-                        style={{
-                          height: '100%',
-                          border: '1px solid var(--border-weak)',
-                          borderRadius: 8,
-                          background: 'var(--panel-bg)',
-                          padding: 12,
-                          display: 'grid',
-                          gap: 8,
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <div style={{ fontWeight: 600 }}>{row.title}</div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                          {row.type} · {row.datasource || 'default'}
-                        </div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
-                          x={row.x} y={row.y} w={row.w} h={row.h}
-                        </div>
-                        <pre
+              <div style={{ overflowX: 'auto' }}>
+                <div style={{ minWidth: 960 }}>
+                  <GridLayout
+                    className="layout-canvas"
+                    layout={gridLayout}
+                    cols={24}
+                    rowHeight={30}
+                    width={960}
+                    margin={[12, 12]}
+                    containerPadding={[0, 0]}
+                    isDraggable
+                    isResizable
+                    onLayoutChange={onLayoutChange}
+                  >
+                    {rows.map((row) => (
+                      <div key={String(row.id)}>
+                        <div
                           style={{
-                            margin: 0,
-                            whiteSpace: 'pre-wrap',
-                            wordBreak: 'break-word',
-                            fontSize: 12,
+                            height: '100%',
+                            border: '1px solid var(--border-weak)',
+                            borderRadius: 8,
+                            background: 'var(--panel-bg)',
+                            padding: 12,
+                            display: 'grid',
+                            gap: 8,
                             overflow: 'hidden',
                           }}
                         >
-                          {row.expr}
-                        </pre>
+                          <div style={{ fontWeight: 600 }}>{row.title}</div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                            {row.type} · {row.datasource || 'default'}
+                          </div>
+                          <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>
+                            x={row.x} y={row.y} w={row.w} h={row.h}
+                          </div>
+                          <pre
+                            style={{
+                              margin: 0,
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                              fontSize: 12,
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {row.expr}
+                          </pre>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </GridLayout>
+                    ))}
+                  </GridLayout>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16 }}>
-            <div style={{ fontWeight: 600, marginBottom: 12 }}>Panel Properties</div>
+            <div style={{ fontWeight: 600, marginBottom: 12 }}>
+              {isMobile ? 'Mobile Layout Controls' : 'Panel Properties'}
+            </div>
+            <div style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
+              {isMobile
+                ? 'Mobile mode: edit x, y, w and h directly. The preview below updates in real time.'
+                : 'Fine-tune panel title, size, position and query. Changes sync into the draft JSON automatically.'}
+            </div>
+
             <div style={{ display: 'grid', gap: 12 }}>
               {rows.map((row) => (
                 <div
@@ -492,6 +517,55 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
                       style={{ width: '100%', minHeight: 120, fontFamily: 'monospace', fontSize: 13 }}
                     />
                   </label>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16 }}>
+            <div style={{ fontWeight: 600, marginBottom: 12 }}>Layout Preview</div>
+            <div style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
+              Real-time preview of current x/y/w/h values.
+            </div>
+
+            <div
+              style={{
+                position: 'relative',
+                minHeight: previewHeight,
+                border: '1px dashed var(--border-weak)',
+                borderRadius: 8,
+                background: 'rgba(255,255,255,0.02)',
+                overflow: 'hidden',
+              }}
+            >
+              {rows.map((row) => (
+                <div
+                  key={row.id}
+                  style={{
+                    position: 'absolute',
+                    left: `${(row.x / 24) * 100}%`,
+                    top: row.y * 24,
+                    width: `${(row.w / 24) * 100}%`,
+                    height: row.h * 24,
+                    padding: 8,
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div
+                    style={{
+                      height: '100%',
+                      border: '1px solid var(--border-weak)',
+                      borderRadius: 8,
+                      background: 'var(--panel-bg)',
+                      padding: 8,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, fontSize: 13 }}>{row.title}</div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 11, marginTop: 4 }}>
+                      x={row.x} y={row.y} w={row.w} h={row.h}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
