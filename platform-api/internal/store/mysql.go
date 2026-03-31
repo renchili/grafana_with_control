@@ -91,11 +91,60 @@ func (s *MySQLStore) GetConflict(id int64) (*model.ConflictPayload, bool) {
 	return &c, true
 }
 
+
+func (s *MySQLStore) GetPublishedPayload(uid string) (map[string]any, int64, bool) {
+	var raw []byte
+	var version int64
+	err := s.db.QueryRow(`SELECT payload_json, version_no FROM published_payloads WHERE resource_uid = ?`, uid).Scan(&raw, &version)
+	if err != nil { return nil, 0, false }
+	var out map[string]any
+	if err := json.Unmarshal(raw, &out); err != nil { return nil, 0, false }
+	return out, version, true
+}
+
+func (s *MySQLStore) UpsertPublishedPayload(uid string, payload map[string]any, version int64) error {
+	raw, err := json.Marshal(payload)
+	if err != nil { return err }
+	_, err = s.db.Exec(`
+		INSERT INTO published_payloads (resource_uid, payload_json, version_no)
+		VALUES (?, ?, ?)
+		ON DUPLICATE KEY UPDATE
+			payload_json = VALUES(payload_json),
+			version_no = VALUES(version_no)
+	`, uid, raw, version)
+	return err
+}
+
+func (s *MySQLStore) GetResourceDefinitionByUID(uid string) (model.Draft, map[string]any, bool) {
+	draft, ok := s.GetDraftByUID(uid)
+	if !ok { return model.Draft{}, nil, false }
+
+	if payload, version, found := s.GetPublishedPayload(uid); found {
+		draft.BaseVersionNo = version
+		return draft, payload, true
+	}
+
+	payload, _ := s.GetDraftPayload(draft.DraftID)
+	return draft, payload, true
+}
+
 func (s *MySQLStore) PublishDraft(id int64) (*model.ActionResponse, bool) {
-	res, err := s.db.Exec(`UPDATE drafts SET status = 'published', updated_at = CURRENT_TIMESTAMP WHERE id = ?`, id)
+	draft, ok := s.GetDraft(id)
+	if !ok { return nil, false }
+
+	payload, ok := s.GetDraftPayload(id)
+	if !ok { return nil, false }
+
+	nextVersion := draft.BaseVersionNo + 1
+	if err := s.UpsertPublishedPayload(draft.ResourceUID, payload, nextVersion); err != nil {
+		return nil, false
+	}
+
+	res, err := s.db.Exec(`UPDATE drafts SET status = 'published', base_version_no = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`, nextVersion, id)
 	if err != nil { return nil, false }
 	n,_ := res.RowsAffected()
 	if n==0 { return nil,false }
+
 	return &model.ActionResponse{Success:true, Message:"draft published", JobID:id}, true
 }
 

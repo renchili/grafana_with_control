@@ -33,6 +33,22 @@ func (h *Handler) listDrafts(c *gin.Context) { c.JSON(http.StatusOK, h.store.Lis
 
 func (h *Handler) getResourceDefinition(c *gin.Context) {
 	uid := c.Param("uid")
+
+	if storeWithPublished, ok := h.store.(interface {
+		GetResourceDefinitionByUID(uid string) (model.Draft, map[string]any, bool)
+	}); ok {
+		draft, payload, found := storeWithPublished.GetResourceDefinitionByUID(uid)
+		if !found {
+			c.JSON(http.StatusNotFound, gin.H{"message": "resource not found"})
+			return
+		}
+		if payload == nil {
+			payload = defaultDraftPayloadForHandler(draft)
+		}
+		c.JSON(http.StatusOK, buildDraftDetail(draft, payload))
+		return
+	}
+
 	draft, found := h.store.GetDraftByUID(uid)
 	if !found {
 		c.JSON(http.StatusNotFound, gin.H{"message": "resource not found"})
