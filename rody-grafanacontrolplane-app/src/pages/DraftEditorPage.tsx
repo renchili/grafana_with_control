@@ -292,7 +292,7 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
           <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16 }}>
             <div style={{ fontWeight: 600, marginBottom: 12 }}>Layout Editor</div>
             <div style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
-              Edit grid position for each panel, then click <strong>Apply Layout To JSON</strong>, then <strong>Save</strong>.
+              Edit grid position for each panel, then click Apply Layout To JSON, then Save.
             </div>
 
             <div style={{ overflowX: 'auto' }}>
