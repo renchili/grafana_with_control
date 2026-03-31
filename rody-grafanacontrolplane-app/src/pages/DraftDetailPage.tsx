@@ -63,11 +63,9 @@ export const DraftDetailPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
     }
   };
 
-  const openInGrafana = () => {
-    if (!data?.resourceUid) {
-      return;
-    }
-    window.location.href = `/d/${data.resourceUid}`;
+  const openPreview = () => {
+    const url = `/a/rody-grafanacontrolplane-app/preview/${draftId}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   useEffect(() => {
@@ -79,7 +77,7 @@ export const DraftDetailPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
       <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16, background: 'var(--panel-bg)' }}>
         <div style={{ fontSize: 24, fontWeight: 700 }}>Draft Detail</div>
         <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>
-          Draft lifecycle and controlled actions. Native dashboard editing remains in Grafana.
+          Continue work on a governed draft and take controlled actions.
         </div>
       </div>
 
@@ -100,10 +98,10 @@ export const DraftDetailPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button
               type="button"
-              onClick={openInGrafana}
+              onClick={openPreview}
               style={getButtonStyle()}
             >
-              Open in Grafana
+              预览
             </button>
 
             <button
