@@ -96,11 +96,7 @@ export const DraftDetailPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button
-              type="button"
-              onClick={openPreview}
-              style={getButtonStyle()}
-            >
+            <button type="button" onClick={openPreview} style={getButtonStyle()}>
               预览
             </button>
 
