@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Button } from '../components/ui';
 
-type Row = {
+type Panel = {
   id: number;
   title: string;
   expr: string;
@@ -12,42 +11,44 @@ type Row = {
 };
 
 export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' }) => {
-  const [rows, setRows] = useState<Row[]>([]);
+  const [panels, setPanels] = useState<Panel[]>([]);
+  const [selected, setSelected] = useState<number | null>(null);
   const [json, setJson] = useState('');
 
   const load = async () => {
     const r = await fetch(`/api/platform/v1/drafts/${draftId}`);
     const d = await r.json();
 
-    const panels = d.rawDraft?.panels || [];
-    const mapped = panels.map((p: any, i: number) => ({
-      id: p.id || i + 1,
-      title: p.title || 'Panel',
-      expr: p.targets?.[0]?.expr || '',
-      x: p.gridPos?.x || 0,
-      y: p.gridPos?.y || i * 8,
-      w: p.gridPos?.w || 12,
-      h: p.gridPos?.h || 8
+    const p = (d.rawDraft?.panels || []).map((x: any, i: number) => ({
+      id: x.id || i,
+      title: x.title || 'Panel',
+      expr: x.targets?.[0]?.expr || '',
+      x: x.gridPos?.x || 0,
+      y: x.gridPos?.y || i * 8,
+      w: x.gridPos?.w || 12,
+      h: x.gridPos?.h || 8
     }));
 
-    setRows(mapped);
+    setPanels(p);
     setJson(JSON.stringify(d.rawDraft || {}, null, 2));
   };
 
-  useEffect(() => { load(); }, [draftId]);
+  useEffect(() => { load(); }, []);
 
-  const update = (id: number, k: keyof Row, v: any) => {
-    const next = rows.map(r => r.id === id ? { ...r, [k]: v } : r);
-    setRows(next);
+  const update = (id: number, k: keyof Panel, v: any) => {
+    const next = panels.map(p => p.id === id ? { ...p, [k]: v } : p);
+    setPanels(next);
 
-    const panels = next.map(r => ({
-      id: r.id,
-      title: r.title,
-      gridPos: { x: r.x, y: r.y, w: r.w, h: r.h },
-      targets: [{ expr: r.expr }]
-    }));
+    const payload = {
+      panels: next.map(p => ({
+        id: p.id,
+        title: p.title,
+        gridPos: { x: p.x, y: p.y, w: p.w, h: p.h },
+        targets: [{ expr: p.expr }]
+      }))
+    };
 
-    setJson(JSON.stringify({ panels }, null, 2));
+    setJson(JSON.stringify(payload, null, 2));
   };
 
   const save = async () => {
@@ -56,70 +57,94 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
       headers: { 'Content-Type': 'application/json' },
       body: json
     });
-    alert('saved');
   };
 
   const publish = async () => {
     await fetch(`/api/platform/v1/drafts/${draftId}/publish`, { method: 'POST' });
-    alert('published');
   };
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      <Card title="Editor">
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Button onClick={save}>Save</Button>
-          <Button onClick={publish}>Publish</Button>
-        </div>
-      </Card>
 
-      <Card title="Panels">
-        {rows.map(r => (
-          <div key={r.id} style={{ border: '1px solid #333', padding: 12, marginBottom: 8 }}>
-            <input value={r.title} onChange={e => update(r.id, 'title', e.target.value)} />
+      {/* Toolbar */}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button onClick={save}>Save</button>
+        <button onClick={publish}>Publish</button>
+      </div>
 
-            <div style={{ display: 'flex', gap: 6 }}>
-              {['x','y','w','h'].map(k => (
-                <input
-                  key={k}
-                  type="number"
-                  value={(r as any)[k]}
-                  onChange={e => update(r.id, k as any, Number(e.target.value))}
-                  style={{ width: 60 }}
-                />
-              ))}
+      {/* Layout Canvas */}
+      <div style={{
+        border: '1px solid #333',
+        borderRadius: 8,
+        padding: 16,
+        minHeight: 400,
+        position: 'relative'
+      }}>
+        {panels.map(p => (
+          <div
+            key={p.id}
+            onClick={() => setSelected(p.id)}
+            style={{
+              position: 'absolute',
+              left: `${p.x * 4}%`,
+              top: p.y * 20,
+              width: `${p.w * 4}%`,
+              height: p.h * 20,
+              border: selected === p.id ? '2px solid #3274d9' : '1px solid #555',
+              borderRadius: 6,
+              padding: 8,
+              background: '#1f1f1f',
+              cursor: 'pointer'
+            }}
+          >
+            <div style={{ fontWeight: 600 }}>{p.title}</div>
+            <div style={{ fontSize: 12, opacity: 0.7 }}>
+              x:{p.x} y:{p.y} w:{p.w} h:{p.h}
             </div>
-
-            <textarea
-              value={r.expr}
-              onChange={e => update(r.id, 'expr', e.target.value)}
-              style={{ width: '100%' }}
-            />
           </div>
         ))}
-      </Card>
+      </div>
 
-      <Card title="Preview">
-        <div style={{ position: 'relative', height: 400 }}>
-          {rows.map(r => (
-            <div key={r.id} style={{
-              position: 'absolute',
-              left: `${r.x * 4}%`,
-              top: r.y * 20,
-              width: `${r.w * 4}%`,
-              height: r.h * 20,
-              border: '1px solid #888',
-              padding: 4
-            }}>
-              {r.title}
-            </div>
-          ))}
+      {/* Properties */}
+      {selected !== null && (
+        <div style={{ border: '1px solid #333', padding: 16, borderRadius: 8 }}>
+          <h4>Panel Properties</h4>
+
+          {(() => {
+            const p = panels.find(x => x.id === selected)!;
+            return (
+              <>
+                <input
+                  value={p.title}
+                  onChange={e => update(p.id, 'title', e.target.value)}
+                />
+
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {['x','y','w','h'].map(k => (
+                    <input
+                      key={k}
+                      type="number"
+                      value={(p as any)[k]}
+                      onChange={e => update(p.id, k as any, Number(e.target.value))}
+                    />
+                  ))}
+                </div>
+
+                <textarea
+                  value={p.expr}
+                  onChange={e => update(p.id, 'expr', e.target.value)}
+                />
+              </>
+            );
+          })()}
         </div>
-      </Card>
+      )}
 
-      <Card title="JSON">
-        <textarea value={json} onChange={e => setJson(e.target.value)} style={{ width: '100%', height: 200 }} />
-      </Card>
+      {/* JSON */}
+      <div>
+        <textarea value={json} onChange={e => setJson(e.target.value)} />
+      </div>
+
     </div>
   );
 };
