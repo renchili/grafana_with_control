@@ -5,6 +5,8 @@ import { PublishCenterPage } from '../../pages/PublishCenterPage';
 import { ConflictResolvePage } from '../../pages/ConflictResolvePage';
 import { GovernancePage } from '../../pages/GovernancePage';
 import { DatasourceChangesPage } from '../../pages/DatasourceChangesPage';
+import { DraftDetailPage } from '../../pages/DraftDetailPage';
+import { ResourceDefinitionPage } from '../../pages/ResourceDefinitionPage';
 
 type AppProps = {
   path?: string;
@@ -18,35 +20,18 @@ const navItems = [
   { label: 'Datasource Changes', path: '/a/rody-grafanacontrolplane-app/datasource-changes' },
 ];
 
-const pageWrap: React.CSSProperties = {
-  padding: 20,
-  display: 'grid',
-  gap: 16,
-};
-
-const cardStyle: React.CSSProperties = {
-  border: '1px solid var(--border-weak)',
-  borderRadius: 8,
-  background: 'var(--panel-bg)',
-  padding: 16,
-};
-
-const navButtonStyle = (active: boolean): React.CSSProperties => ({
-  height: 36,
-  padding: '0 14px',
-  borderRadius: 6,
-  border: '1px solid var(--border-weak)',
-  background: active ? '#3274d9' : 'var(--panel-bg)',
-  color: active ? '#fff' : 'var(--text-primary)',
-  cursor: 'pointer',
-  fontSize: 13,
-  fontWeight: 500,
-});
-
 export const App = ({ path = '/a/rody-grafanacontrolplane-app/drafts' }: AppProps) => {
   const normalizedPath = path.replace(/\/+$/, '') || '/a/rody-grafanacontrolplane-app';
 
   const renderPage = () => {
+    if (normalizedPath.includes('/draft/')) {
+      const draftId = normalizedPath.split('/draft/')[1] || '0';
+      return <DraftDetailPage draftId={draftId} />;
+    }
+    if (normalizedPath.includes('/resource/')) {
+      const uid = normalizedPath.split('/resource/')[1] || '';
+      return <ResourceDefinitionPage uid={uid} />;
+    }
     if (normalizedPath.includes('/publish-center')) {
       return <PublishCenterPage />;
     }
@@ -63,9 +48,9 @@ export const App = ({ path = '/a/rody-grafanacontrolplane-app/drafts' }: AppProp
   };
 
   return (
-    <div style={pageWrap}>
-      <div style={cardStyle}>
-        <div style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.2 }}>Grafana Control Plane</div>
+    <div style={{ padding: 20, display: 'grid', gap: 16 }}>
+      <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, background: 'var(--panel-bg)', padding: 16 }}>
+        <div style={{ fontSize: 24, fontWeight: 700 }}>Grafana Control Plane</div>
         <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>
           Grafana = Data Plane · Platform = Control Plane
         </div>
@@ -73,12 +58,13 @@ export const App = ({ path = '/a/rody-grafanacontrolplane-app/drafts' }: AppProp
 
       <div
         style={{
-          ...cardStyle,
+          border: '1px solid var(--border-weak)',
+          borderRadius: 8,
+          background: 'var(--panel-bg)',
           padding: 12,
           display: 'flex',
           gap: 8,
           flexWrap: 'wrap',
-          alignItems: 'center',
         }}
       >
         {navItems.map((item) => {
@@ -88,7 +74,17 @@ export const App = ({ path = '/a/rody-grafanacontrolplane-app/drafts' }: AppProp
               key={item.path}
               type="button"
               onClick={() => locationService.push(item.path)}
-              style={navButtonStyle(active)}
+              style={{
+                height: 36,
+                padding: '0 14px',
+                borderRadius: 6,
+                border: '1px solid var(--border-weak)',
+                background: active ? '#3274d9' : 'var(--panel-bg)',
+                color: active ? '#fff' : 'var(--text-primary)',
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: 500,
+              }}
             >
               {item.label}
             </button>
