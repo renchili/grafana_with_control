@@ -99,15 +99,26 @@ export const DraftsPage: React.FC = () => {
                   <td style={{ padding: 12 }}>{draft.status}</td>
                   <td style={{ padding: 12 }}>{draft.updatedAt}</td>
                   <td style={{ padding: 12 }}>
-                    <button
-                      type="button"
-                      style={{ padding: '6px 10px', cursor: 'pointer' }}
-                      onClick={() =>
-                        locationService.push(`/a/rody-grafanacontrolplane-app/resource/${draft.resourceUid}`)
-                      }
-                    >
-                      View definition
-                    </button>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        style={{ padding: '6px 10px', cursor: 'pointer' }}
+                        onClick={() =>
+                          locationService.push(`/a/rody-grafanacontrolplane-app/draft/${draft.draftId}`)
+                        }
+                      >
+                        Resume
+                      </button>
+                      <button
+                        type="button"
+                        style={{ padding: '6px 10px', cursor: 'pointer' }}
+                        onClick={() =>
+                          locationService.push(`/a/rody-grafanacontrolplane-app/resource/${draft.resourceUid}`)
+                        }
+                      >
+                        View definition
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

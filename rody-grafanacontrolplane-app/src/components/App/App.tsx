@@ -2,6 +2,7 @@ import React from 'react';
 import { locationService } from '@grafana/runtime';
 import { DraftsPage } from '../../pages/DraftsPage';
 import { ResourceReadonlyPage } from '../../pages/ResourceReadonlyPage';
+import { DraftEditorPage } from '../../pages/DraftEditorPage';
 
 type AppProps = {
   path?: string;
@@ -15,7 +16,9 @@ const navItems = [
 export const App = ({ path = '/a/rody-grafanacontrolplane-app/drafts' }: AppProps) => {
   const normalizedPath = path.replace(/\/+$/, '') || '/a/rody-grafanacontrolplane-app';
   const isResource = normalizedPath.includes('/resource/');
+  const isDraft = normalizedPath.includes('/draft/');
   const uid = isResource ? normalizedPath.split('/resource/')[1] || 'cpu-overview' : 'cpu-overview';
+  const draftId = isDraft ? normalizedPath.split('/draft/')[1] || '0' : '0';
 
   return (
     <div style={{ padding: 20, display: 'grid', gap: 16 }}>
@@ -59,7 +62,7 @@ export const App = ({ path = '/a/rody-grafanacontrolplane-app/drafts' }: AppProp
         })}
       </div>
 
-      {isResource ? <ResourceReadonlyPage uid={uid} /> : <DraftsPage />}
+      {isDraft ? <DraftEditorPage draftId={draftId} /> : isResource ? <ResourceReadonlyPage uid={uid} /> : <DraftsPage />}
     </div>
   );
 };
