@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { getButtonStyle } from '../components/common/buttonStyles';
 
 type DraftDetail = {
   draftId: number;
@@ -68,7 +69,7 @@ export const DraftDetailPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-      <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16 }}>
+      <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16, background: 'var(--panel-bg)' }}>
         <div style={{ fontSize: 24, fontWeight: 700 }}>Draft Detail</div>
         <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>
           Continue work on a governed draft and take controlled actions.
@@ -80,7 +81,7 @@ export const DraftDetailPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
 
       {data && (
         <>
-          <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16, display: 'grid', gap: 8 }}>
+          <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16, background: 'var(--panel-bg)', display: 'grid', gap: 8 }}>
             <div><strong>Title:</strong> {data.title}</div>
             <div><strong>Resource UID:</strong> {data.resourceUid}</div>
             <div><strong>Owner:</strong> {data.ownerName}</div>
@@ -94,7 +95,7 @@ export const DraftDetailPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
               type="button"
               onClick={() => void publish()}
               disabled={data.status !== 'active'}
-              style={{ height: 36, padding: '0 14px' }}
+              style={getButtonStyle({ disabled: data.status !== 'active' })}
             >
               Publish
             </button>
@@ -102,13 +103,13 @@ export const DraftDetailPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
               type="button"
               onClick={() => void abandon()}
               disabled={data.status !== 'active'}
-              style={{ height: 36, padding: '0 14px' }}
+              style={getButtonStyle({ disabled: data.status !== 'active' })}
             >
               Abandon
             </button>
           </div>
 
-          <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16 }}>
+          <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16, background: 'var(--panel-bg)' }}>
             <div style={{ fontWeight: 600, marginBottom: 8 }}>Raw Draft JSON</div>
             <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
               {JSON.stringify(data.rawDraft ?? {}, null, 2)}

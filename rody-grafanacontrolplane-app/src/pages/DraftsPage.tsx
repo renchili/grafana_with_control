@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { locationService } from '@grafana/runtime';
+import { getButtonStyle } from '../components/common/buttonStyles';
 
 type Draft = {
   draftId: number;
@@ -79,7 +80,7 @@ export const DraftsPage: React.FC = () => {
       </div>
 
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <button type="button" onClick={() => void load()} style={{ height: 36, padding: '0 14px' }}>
+        <button type="button" onClick={() => void load()} style={getButtonStyle()}>
           Refresh
         </button>
       </div>
@@ -90,88 +91,93 @@ export const DraftsPage: React.FC = () => {
 
       {!loading && !error && (
         <div style={{ display: 'grid', gap: 12 }}>
-          {data.map((draft) => (
-            <div
-              key={draft.draftId}
-              style={{
-                border: '1px solid var(--border-weak)',
-                borderRadius: 8,
-                background: 'var(--panel-bg)',
-                padding: 16,
-                display: 'grid',
-                gap: 12,
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: 18, fontWeight: 600 }}>{draft.title}</div>
-                  <div style={{ color: 'var(--text-secondary)', marginTop: 4 }}>{draft.resourceUid}</div>
+          {data.map((draft) => {
+            const canResume = draft.status === 'active' || draft.status === 'conflict';
+            const canAbandon = draft.status === 'active';
+
+            return (
+              <div
+                key={draft.draftId}
+                style={{
+                  border: '1px solid var(--border-weak)',
+                  borderRadius: 8,
+                  background: 'var(--panel-bg)',
+                  padding: 16,
+                  display: 'grid',
+                  gap: 12,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontSize: 18, fontWeight: 600 }}>{draft.title}</div>
+                    <div style={{ color: 'var(--text-secondary)', marginTop: 4 }}>{draft.resourceUid}</div>
+                  </div>
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      height: 24,
+                      padding: '0 10px',
+                      borderRadius: 999,
+                      color: '#fff',
+                      background: statusColor(draft.status),
+                      fontSize: 12,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {draft.status}
+                  </span>
                 </div>
-                <span
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    height: 24,
-                    padding: '0 10px',
-                    borderRadius: 999,
-                    color: '#fff',
-                    background: statusColor(draft.status),
-                    fontSize: 12,
-                    fontWeight: 600,
-                  }}
-                >
-                  {draft.status}
-                </span>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+                  <div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Owner</div>
+                    <div style={{ marginTop: 4 }}>{draft.ownerName}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Base Version</div>
+                    <div style={{ marginTop: 4 }}>v{draft.baseVersionNo}</div>
+                  </div>
+                  <div>
+                    <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Updated</div>
+                    <div style={{ marginTop: 4 }}>{draft.updatedAt}</div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    style={getButtonStyle({ disabled: !canResume })}
+                    disabled={!canResume}
+                    onClick={() =>
+                      locationService.push(`/a/rody-grafanacontrolplane-app/draft/${draft.draftId}`)
+                    }
+                  >
+                    Resume
+                  </button>
+
+                  <button
+                    type="button"
+                    style={getButtonStyle()}
+                    onClick={() =>
+                      locationService.push(`/a/rody-grafanacontrolplane-app/resource/${draft.resourceUid}`)
+                    }
+                  >
+                    View definition
+                  </button>
+
+                  <button
+                    type="button"
+                    style={getButtonStyle({ disabled: !canAbandon })}
+                    disabled={!canAbandon}
+                    onClick={() => void abandonDraft(draft.draftId)}
+                  >
+                    Abandon
+                  </button>
+                </div>
               </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
-                <div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Owner</div>
-                  <div style={{ marginTop: 4 }}>{draft.ownerName}</div>
-                </div>
-                <div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Base Version</div>
-                  <div style={{ marginTop: 4 }}>v{draft.baseVersionNo}</div>
-                </div>
-                <div>
-                  <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>Updated</div>
-                  <div style={{ marginTop: 4 }}>{draft.updatedAt}</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  style={{ height: 36, padding: '0 14px' }}
-                  disabled={draft.status !== 'active' && draft.status !== 'conflict'}
-                  onClick={() =>
-                    locationService.push(`/a/rody-grafanacontrolplane-app/draft/${draft.draftId}`)
-                  }
-                >
-                  Resume
-                </button>
-
-                <button
-                  type="button"
-                  style={{ height: 36, padding: '0 14px' }}
-                  onClick={() =>
-                    locationService.push(`/a/rody-grafanacontrolplane-app/resource/${draft.resourceUid}`)
-                  }
-                >
-                  View definition
-                </button>
-
-                <button
-                  type="button"
-                  style={{ height: 36, padding: '0 14px' }}
-                  disabled={draft.status !== 'active'}
-                  onClick={() => void abandonDraft(draft.draftId)}
-                >
-                  Abandon
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

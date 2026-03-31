@@ -7,6 +7,7 @@ import { GovernancePage } from '../../pages/GovernancePage';
 import { DatasourceChangesPage } from '../../pages/DatasourceChangesPage';
 import { DraftDetailPage } from '../../pages/DraftDetailPage';
 import { ResourceDefinitionPage } from '../../pages/ResourceDefinitionPage';
+import { getButtonStyle } from '../common/buttonStyles';
 
 type AppProps = {
   path?: string;
@@ -19,6 +20,13 @@ const navItems = [
   { label: 'Governance', path: '/a/rody-grafanacontrolplane-app/governance' },
   { label: 'Datasource Changes', path: '/a/rody-grafanacontrolplane-app/datasource-changes' },
 ];
+
+const cardStyle: React.CSSProperties = {
+  border: '1px solid var(--border-weak)',
+  borderRadius: 8,
+  background: 'var(--panel-bg)',
+  padding: 16,
+};
 
 export const App = ({ path = '/a/rody-grafanacontrolplane-app/drafts' }: AppProps) => {
   const normalizedPath = path.replace(/\/+$/, '') || '/a/rody-grafanacontrolplane-app';
@@ -49,7 +57,7 @@ export const App = ({ path = '/a/rody-grafanacontrolplane-app/drafts' }: AppProp
 
   return (
     <div style={{ padding: 20, display: 'grid', gap: 16 }}>
-      <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, background: 'var(--panel-bg)', padding: 16 }}>
+      <div style={cardStyle}>
         <div style={{ fontSize: 24, fontWeight: 700 }}>Grafana Control Plane</div>
         <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>
           Grafana = Data Plane · Platform = Control Plane
@@ -58,9 +66,7 @@ export const App = ({ path = '/a/rody-grafanacontrolplane-app/drafts' }: AppProp
 
       <div
         style={{
-          border: '1px solid var(--border-weak)',
-          borderRadius: 8,
-          background: 'var(--panel-bg)',
+          ...cardStyle,
           padding: 12,
           display: 'flex',
           gap: 8,
@@ -74,17 +80,7 @@ export const App = ({ path = '/a/rody-grafanacontrolplane-app/drafts' }: AppProp
               key={item.path}
               type="button"
               onClick={() => locationService.push(item.path)}
-              style={{
-                height: 36,
-                padding: '0 14px',
-                borderRadius: 6,
-                border: '1px solid var(--border-weak)',
-                background: active ? '#3274d9' : 'var(--panel-bg)',
-                color: active ? '#fff' : 'var(--text-primary)',
-                cursor: 'pointer',
-                fontSize: 13,
-                fontWeight: 500,
-              }}
+              style={getButtonStyle({ active })}
             >
               {item.label}
             </button>
