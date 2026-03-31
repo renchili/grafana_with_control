@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { locationService } from '@grafana/runtime';
 
 type Draft = {
@@ -29,6 +29,7 @@ export const DraftsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [actioningId, setActioningId] = useState<number | null>(null);
+  const [isMobile, setIsMobile] = useState<boolean>(typeof window !== 'undefined' ? window.innerWidth < 900 : false);
 
   const load = async () => {
     setLoading(true);
@@ -87,6 +88,64 @@ export const DraftsPage: React.FC = () => {
     void load();
   }, []);
 
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 900);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  const emptyState = useMemo(
+    () => (
+      <div
+        style={{
+          border: '1px solid var(--border-weak)',
+          borderRadius: 8,
+          background: 'var(--panel-bg)',
+          padding: 16,
+          color: 'var(--text-secondary)',
+        }}
+      >
+        No drafts found.
+      </div>
+    ),
+    []
+  );
+
+  const actionButtons = (draft: Draft) => (
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+      <button
+        type="button"
+        style={{ padding: '6px 10px', cursor: 'pointer' }}
+        onClick={() => locationService.push(`/a/rody-grafanacontrolplane-app/draft/${draft.draftId}`)}
+      >
+        Resume
+      </button>
+      <button
+        type="button"
+        style={{ padding: '6px 10px', cursor: 'pointer' }}
+        onClick={() => locationService.push(`/a/rody-grafanacontrolplane-app/resource/${draft.resourceUid}`)}
+      >
+        View definition
+      </button>
+      <button
+        type="button"
+        style={{ padding: '6px 10px', cursor: 'pointer' }}
+        onClick={() => void publishDraft(draft.draftId)}
+        disabled={actioningId === draft.draftId}
+      >
+        Publish
+      </button>
+      <button
+        type="button"
+        style={{ padding: '6px 10px', cursor: 'pointer' }}
+        onClick={() => void abandonDraft(draft.draftId)}
+        disabled={actioningId === draft.draftId}
+      >
+        Abandon
+      </button>
+    </div>
+  );
+
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <div
@@ -117,16 +176,18 @@ export const DraftsPage: React.FC = () => {
         </div>
       )}
 
-      {!loading && !error && (
+      {!loading && !error && data.length === 0 && emptyState}
+
+      {!loading && !error && data.length > 0 && !isMobile && (
         <div
           style={{
             border: '1px solid var(--border-weak)',
             borderRadius: 8,
             background: 'var(--panel-bg)',
-            overflow: 'hidden',
+            overflowX: 'auto',
           }}
         >
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 900 }}>
             <thead>
               <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-weak)' }}>
                 <th style={{ padding: 12 }}>Title</th>
@@ -161,55 +222,66 @@ export const DraftsPage: React.FC = () => {
                     </span>
                   </td>
                   <td style={{ padding: 12 }}>{draft.updatedAt}</td>
-                  <td style={{ padding: 12 }}>
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button
-                        type="button"
-                        style={{ padding: '6px 10px', cursor: 'pointer' }}
-                        onClick={() =>
-                          locationService.push(`/a/rody-grafanacontrolplane-app/draft/${draft.draftId}`)
-                        }
-                      >
-                        Resume
-                      </button>
-                      <button
-                        type="button"
-                        style={{ padding: '6px 10px', cursor: 'pointer' }}
-                        onClick={() =>
-                          locationService.push(`/a/rody-grafanacontrolplane-app/resource/${draft.resourceUid}`)
-                        }
-                      >
-                        View definition
-                      </button>
-                      <button
-                        type="button"
-                        style={{ padding: '6px 10px', cursor: 'pointer' }}
-                        onClick={() => void publishDraft(draft.draftId)}
-                        disabled={actioningId === draft.draftId}
-                      >
-                        Publish
-                      </button>
-                      <button
-                        type="button"
-                        style={{ padding: '6px 10px', cursor: 'pointer' }}
-                        onClick={() => void abandonDraft(draft.draftId)}
-                        disabled={actioningId === draft.draftId}
-                      >
-                        Abandon
-                      </button>
-                    </div>
-                  </td>
+                  <td style={{ padding: 12 }}>{actionButtons(draft)}</td>
                 </tr>
               ))}
-              {data.length === 0 && (
-                <tr>
-                  <td colSpan={6} style={{ padding: 12, color: 'var(--text-secondary)' }}>
-                    No drafts found.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {!loading && !error && data.length > 0 && isMobile && (
+        <div style={{ display: 'grid', gap: 12 }}>
+          {data.map((draft) => (
+            <div
+              key={draft.draftId}
+              style={{
+                border: '1px solid var(--border-weak)',
+                borderRadius: 10,
+                background: 'var(--panel-bg)',
+                padding: 14,
+                display: 'grid',
+                gap: 12,
+              }}
+            >
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 18 }}>{draft.title}</div>
+                <div style={{ color: 'var(--text-secondary)', marginTop: 4 }}>{draft.resourceUid}</div>
+              </div>
+
+              <div style={{ display: 'grid', gap: 8 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Owner</span>
+                  <span>{draft.ownerName}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Base Version</span>
+                  <span>v{draft.baseVersionNo}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Status</span>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      borderRadius: 9999,
+                      color: '#fff',
+                      background: statusColor(draft.status),
+                      fontSize: 12,
+                    }}
+                  >
+                    {draft.status}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Updated</span>
+                  <span>{draft.updatedAt}</span>
+                </div>
+              </div>
+
+              {actionButtons(draft)}
+            </div>
+          ))}
         </div>
       )}
     </div>
