@@ -584,3 +584,16 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
     </div>
   );
 };
+
+// 在 Layout Preview 下面加 iframe
+// 找到 Layout Preview div 后追加：
+
+<iframe
+  src="http://localhost:3000/d/preview?orgId=1"
+  style={{
+    width: '100%',
+    height: 500,
+    border: 'none',
+    marginTop: 16
+  }}
+/>
