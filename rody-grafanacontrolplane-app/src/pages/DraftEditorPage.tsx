@@ -1,9 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 type QueryDefinition = {
   refId: string;
   datasource?: string;
   expression: string;
+};
+
+type GridPos = {
+  h?: number;
+  w?: number;
+  x?: number;
+  y?: number;
 };
 
 type PanelDefinition = {
@@ -27,6 +34,69 @@ type DraftDetail = {
   rawDraft?: Record<string, unknown>;
 };
 
+type LayoutRow = {
+  id: number;
+  title: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+};
+
+function extractPanelsFromRawDraft(rawDraft: Record<string, unknown> | undefined, fallbackPanels: PanelDefinition[]): LayoutRow[] {
+  const rawPanels = Array.isArray(rawDraft?.panels) ? (rawDraft!.panels as Array<Record<string, unknown>>) : [];
+  if (rawPanels.length > 0) {
+    return rawPanels.map((panel, idx) => {
+      const gridPos = (panel.gridPos ?? {}) as GridPos;
+      return {
+        id: Number(panel.id ?? idx + 1),
+        title: String(panel.title ?? `Panel ${idx + 1}`),
+        x: Number(gridPos.x ?? 0),
+        y: Number(gridPos.y ?? idx * 8),
+        w: Number(gridPos.w ?? 12),
+        h: Number(gridPos.h ?? 8),
+      };
+    });
+  }
+
+  return fallbackPanels.map((panel, idx) => ({
+    id: Number(panel.id ?? idx + 1),
+    title: panel.title ?? `Panel ${idx + 1}`,
+    x: idx % 2 === 0 ? 0 : 12,
+    y: Math.floor(idx / 2) * 8,
+    w: 12,
+    h: 8,
+  }));
+}
+
+function applyLayoutToRawDraft(rawDraft: Record<string, unknown>, layoutRows: LayoutRow[]): Record<string, unknown> {
+  const next = { ...rawDraft };
+  const currentPanels = Array.isArray(next.panels) ? [...(next.panels as Array<Record<string, unknown>>)] : [];
+
+  const byId = new Map(layoutRows.map((row) => [row.id, row]));
+
+  const updatedPanels = currentPanels.map((panel, idx) => {
+    const id = Number(panel.id ?? idx + 1);
+    const row = byId.get(id);
+    if (!row) {
+      return panel;
+    }
+    return {
+      ...panel,
+      gridPos: {
+        ...((panel.gridPos ?? {}) as Record<string, unknown>),
+        x: row.x,
+        y: row.y,
+        w: row.w,
+        h: row.h,
+      },
+    };
+  });
+
+  next.panels = updatedPanels;
+  return next;
+}
+
 export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' }) => {
   const [data, setData] = useState<DraftDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -36,6 +106,7 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [rawDraftText, setRawDraftText] = useState('');
+  const [layoutRows, setLayoutRows] = useState<LayoutRow[]>([]);
 
   const load = async () => {
     setLoading(true);
@@ -47,7 +118,9 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
       }
       const json = await resp.json();
       setData(json);
-      setRawDraftText(JSON.stringify(json.rawDraft ?? {}, null, 2));
+      const pretty = JSON.stringify(json.rawDraft ?? {}, null, 2);
+      setRawDraftText(pretty);
+      setLayoutRows(extractPanelsFromRawDraft(json.rawDraft ?? {}, json.panels ?? []));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load draft');
       setData(null);
@@ -61,9 +134,28 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
       const parsed = rawDraftText ? JSON.parse(rawDraftText) : {};
       setRawDraftText(JSON.stringify(parsed, null, 2));
       setError('');
-    } catch (e) {
+    } catch {
       setError('Invalid JSON in draft payload');
     }
+  };
+
+  const syncLayoutIntoJson = () => {
+    try {
+      const parsed = rawDraftText ? JSON.parse(rawDraftText) : {};
+      const next = applyLayoutToRawDraft(parsed, layoutRows);
+      setRawDraftText(JSON.stringify(next, null, 2));
+      setNotice('Layout synced into draft JSON');
+      setError('');
+    } catch {
+      setError('Invalid JSON in draft payload');
+    }
+  };
+
+  const updateLayoutCell = (panelId: number, field: keyof Omit<LayoutRow, 'id' | 'title'>, value: string) => {
+    const numeric = Number(value);
+    setLayoutRows((rows) =>
+      rows.map((row) => (row.id === panelId ? { ...row, [field]: Number.isFinite(numeric) ? numeric : 0 } : row))
+    );
   };
 
   const saveDraft = async () => {
@@ -74,7 +166,7 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
       let payload: Record<string, unknown> = {};
       try {
         payload = rawDraftText ? JSON.parse(rawDraftText) : {};
-      } catch (e) {
+      } catch {
         throw new Error('Invalid JSON in draft payload');
       }
       const resp = await fetch(`/api/platform/v1/drafts/${draftId}/save`, {
@@ -88,6 +180,7 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
       const json = await resp.json();
       setData(json);
       setRawDraftText(JSON.stringify(json.rawDraft ?? {}, null, 2));
+      setLayoutRows(extractPanelsFromRawDraft(json.rawDraft ?? {}, json.panels ?? []));
       setNotice('Draft saved successfully');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save draft');
@@ -140,6 +233,14 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
     void load();
   }, [draftId]);
 
+  const parsedPreview = useMemo(() => {
+    try {
+      return rawDraftText ? JSON.parse(rawDraftText) : {};
+    } catch {
+      return null;
+    }
+  }, [rawDraftText]);
+
   return (
     <div style={{ display: 'grid', gap: 16 }}>
       <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16 }}>
@@ -155,8 +256,11 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
         <button type="button" onClick={() => void load()} style={{ padding: '8px 12px', cursor: 'pointer' }}>
           Refresh
         </button>
-        <button type="button" onClick={() => void formatJson()} style={{ padding: '8px 12px', cursor: 'pointer' }}>
+        <button type="button" onClick={formatJson} style={{ padding: '8px 12px', cursor: 'pointer' }}>
           Format JSON
+        </button>
+        <button type="button" onClick={syncLayoutIntoJson} style={{ padding: '8px 12px', cursor: 'pointer' }}>
+          Apply Layout To JSON
         </button>
         <button type="button" onClick={() => void saveDraft()} style={{ padding: '8px 12px', cursor: 'pointer' }} disabled={saving}>
           {saving ? 'Saving...' : 'Save'}
@@ -185,6 +289,54 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
 
       {!loading && data && (
         <>
+          <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16 }}>
+            <div style={{ fontWeight: 600, marginBottom: 12 }}>Layout Editor</div>
+            <div style={{ color: 'var(--text-secondary)', marginBottom: 12 }}>
+              Edit grid position for each panel, then click <strong>Apply Layout To JSON</strong>, then <strong>Save</strong>.
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 700 }}>
+                <thead>
+                  <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-weak)' }}>
+                    <th style={{ padding: 10 }}>Panel</th>
+                    <th style={{ padding: 10 }}>x</th>
+                    <th style={{ padding: 10 }}>y</th>
+                    <th style={{ padding: 10 }}>w</th>
+                    <th style={{ padding: 10 }}>h</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {layoutRows.map((row) => (
+                    <tr key={row.id} style={{ borderBottom: '1px solid var(--border-weak)' }}>
+                      <td style={{ padding: 10 }}>
+                        <div style={{ fontWeight: 600 }}>{row.title}</div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: 12 }}>panel #{row.id}</div>
+                      </td>
+                      {(['x', 'y', 'w', 'h'] as const).map((field) => (
+                        <td key={field} style={{ padding: 10 }}>
+                          <input
+                            type="number"
+                            value={row[field]}
+                            onChange={(e) => updateLayoutCell(row.id, field, e.currentTarget.value)}
+                            style={{
+                              width: 80,
+                              padding: '6px 8px',
+                              borderRadius: 6,
+                              border: '1px solid var(--border-weak)',
+                              background: 'var(--panel-bg)',
+                              color: 'var(--text-primary)',
+                            }}
+                          />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16 }}>
             <div style={{ fontWeight: 600, marginBottom: 8 }}>Panels</div>
             <div style={{ display: 'grid', gap: 8 }}>
@@ -216,6 +368,13 @@ export const DraftEditorPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
               onChange={(e) => setRawDraftText(e.currentTarget.value)}
               style={{ width: '100%', minHeight: 420, fontFamily: 'monospace', fontSize: 13 }}
             />
+          </div>
+
+          <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16 }}>
+            <div style={{ fontWeight: 600, marginBottom: 8 }}>JSON Preview Status</div>
+            <div style={{ color: parsedPreview ? '#299c46' : '#d44a3a' }}>
+              {parsedPreview ? 'Draft JSON is valid' : 'Draft JSON is invalid'}
+            </div>
           </div>
         </>
       )}
