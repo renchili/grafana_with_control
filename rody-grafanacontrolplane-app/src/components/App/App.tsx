@@ -9,13 +9,13 @@ type AppProps = {
 
 const navItems = [
   { label: 'Drafts', path: '/a/rody-grafanacontrolplane-app/drafts' },
-  { label: 'Resource', path: '/a/rody-grafanacontrolplane-app/resource/demo-dashboard' },
+  { label: 'Resource', path: '/a/rody-grafanacontrolplane-app/resource/cpu-overview' },
 ];
 
 export const App = ({ path = '/a/rody-grafanacontrolplane-app/drafts' }: AppProps) => {
   const normalizedPath = path.replace(/\/+$/, '') || '/a/rody-grafanacontrolplane-app';
   const isResource = normalizedPath.includes('/resource/');
-  const uid = isResource ? normalizedPath.split('/resource/')[1] || 'demo-dashboard' : 'demo-dashboard';
+  const uid = isResource ? normalizedPath.split('/resource/')[1] || 'cpu-overview' : 'cpu-overview';
 
   return (
     <div style={{ padding: 20, display: 'grid', gap: 16 }}>

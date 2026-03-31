@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { locationService } from '@grafana/runtime';
 
 type QueryDefinition = {
   refId: string;
@@ -26,11 +27,12 @@ type ResourceDefinition = {
   panels: PanelDefinition[];
 };
 
-export const ResourceReadonlyPage: React.FC<{ uid?: string }> = ({ uid = 'demo-dashboard' }) => {
+export const ResourceReadonlyPage: React.FC<{ uid?: string }> = ({ uid = 'cpu-overview' }) => {
   const [data, setData] = useState<ResourceDefinition | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedPanelId, setSelectedPanelId] = useState<number | undefined>(undefined);
+  const [creatingDraft, setCreatingDraft] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -47,6 +49,31 @@ export const ResourceReadonlyPage: React.FC<{ uid?: string }> = ({ uid = 'demo-d
       setData(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const createDraft = async () => {
+    setCreatingDraft(true);
+    setError('');
+    try {
+      const resp = await fetch(`/api/platform/v1/resources/${uid}/drafts`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      const json = await resp.json();
+      if (!json?.draftId) {
+        throw new Error('draftId missing');
+      }
+      locationService.push(`/a/rody-grafanacontrolplane-app/draft/${json.draftId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create draft');
+    } finally {
+      setCreatingDraft(false);
     }
   };
 
@@ -76,9 +103,12 @@ export const ResourceReadonlyPage: React.FC<{ uid?: string }> = ({ uid = 'demo-d
         </div>
       </div>
 
-      <div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button type="button" onClick={() => void load()} style={{ padding: '8px 12px', cursor: 'pointer' }}>
           Refresh
+        </button>
+        <button type="button" onClick={() => void createDraft()} style={{ padding: '8px 12px', cursor: 'pointer' }} disabled={creatingDraft}>
+          {creatingDraft ? 'Creating draft...' : 'Create Draft'}
         </button>
       </div>
 
