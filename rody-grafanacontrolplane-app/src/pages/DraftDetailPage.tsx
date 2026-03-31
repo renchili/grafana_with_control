@@ -64,8 +64,8 @@ export const DraftDetailPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
   };
 
   const openPreview = () => {
-    const url = `/a/rody-grafanacontrolplane-app/preview/${draftId}`;
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const absolute = `${window.location.origin}/a/rody-grafanacontrolplane-app/preview/${draftId}`;
+    window.open(absolute, '_blank', 'noopener,noreferrer');
   };
 
   useEffect(() => {
