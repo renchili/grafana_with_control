@@ -7,7 +7,7 @@ import { GovernancePage } from '../../pages/GovernancePage';
 import { DatasourceChangesPage } from '../../pages/DatasourceChangesPage';
 import { DraftDetailPage } from '../../pages/DraftDetailPage';
 import { ResourceDefinitionPage } from '../../pages/ResourceDefinitionPage';
-import { PreviewPage } from '../../pages/PreviewPage';
+import { GrafanaPreviewBridgePage } from '../../pages/GrafanaPreviewBridgePage';
 import { getButtonStyle } from '../common/buttonStyles';
 
 type AppProps = {
@@ -33,9 +33,9 @@ export const App = ({ path = '/a/rody-grafanacontrolplane-app/drafts' }: AppProp
   const normalizedPath = path.replace(/\/+$/, '') || '/a/rody-grafanacontrolplane-app';
 
   const renderPage = () => {
-    if (normalizedPath.includes('/preview/')) {
-      const draftId = normalizedPath.split('/preview/')[1] || '0';
-      return <PreviewPage draftId={draftId} />;
+    if (normalizedPath.includes('/grafana-preview/')) {
+      const target = normalizedPath.split('/grafana-preview/')[1] || '';
+      return <GrafanaPreviewBridgePage target={target} />;
     }
     if (normalizedPath.includes('/draft/')) {
       const draftId = normalizedPath.split('/draft/')[1] || '0';

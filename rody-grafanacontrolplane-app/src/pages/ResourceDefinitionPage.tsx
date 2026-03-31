@@ -29,11 +29,10 @@ export const ResourceDefinitionPage: React.FC<{ uid?: string }> = ({ uid = '' })
     }
   };
 
-  const openInGrafana = () => {
-    if (!uid) {
-      return;
-    }
-    window.location.href = `/d/${uid}`;
+  const openPreviewWindow = () => {
+    const grafanaTarget = `${window.location.origin}/d/${uid}`;
+    const bridge = `${window.location.origin}/a/rody-grafanacontrolplane-app/grafana-preview/${encodeURIComponent(grafanaTarget)}`;
+    window.open(bridge, '_blank', 'noopener,noreferrer');
   };
 
   useEffect(() => {
@@ -45,7 +44,7 @@ export const ResourceDefinitionPage: React.FC<{ uid?: string }> = ({ uid = '' })
       <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16, background: 'var(--panel-bg)' }}>
         <div style={{ fontSize: 24, fontWeight: 700 }}>Resource Definition</div>
         <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>
-          Published resource metadata. Native dashboard editing remains in Grafana.
+          Current published resource definition and governance metadata.
         </div>
       </div>
 
@@ -53,8 +52,8 @@ export const ResourceDefinitionPage: React.FC<{ uid?: string }> = ({ uid = '' })
         <button type="button" onClick={() => void load()} style={getButtonStyle()}>
           Refresh
         </button>
-        <button type="button" onClick={openInGrafana} style={getButtonStyle()}>
-          Open in Grafana
+        <button type="button" onClick={openPreviewWindow} style={getButtonStyle()}>
+          Preview
         </button>
       </div>
 
@@ -67,7 +66,7 @@ export const ResourceDefinitionPage: React.FC<{ uid?: string }> = ({ uid = '' })
             <div><strong>Resource UID:</strong> {data.resourceUid}</div>
             <div><strong>Owner:</strong> {data.ownerName}</div>
             <div><strong>Governance Mode:</strong> {data.governanceMode}</div>
-            <div><strong>Current Version:</strong> v{data.baseVersionNo}</div>
+            <div><strong>Base Version:</strong> v{data.baseVersionNo}</div>
           </div>
 
           <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16, background: 'var(--panel-bg)' }}>
