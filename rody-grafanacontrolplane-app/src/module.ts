@@ -1,4 +1,9 @@
 import { AppPlugin } from '@grafana/data';
-import { App } from './App';
+import { DraftsPage } from './pages/DraftsPage';
 
-export const plugin = new AppPlugin().setRootPage(App);
+export const plugin = new AppPlugin()
+  .addPage({
+    title: 'Drafts',
+    path: '/drafts',
+    component: DraftsPage,
+  });
