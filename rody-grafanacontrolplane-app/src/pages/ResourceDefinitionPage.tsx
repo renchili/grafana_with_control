@@ -29,6 +29,13 @@ export const ResourceDefinitionPage: React.FC<{ uid?: string }> = ({ uid = '' })
     }
   };
 
+  const openInGrafana = () => {
+    if (!uid) {
+      return;
+    }
+    window.location.href = `/d/${uid}`;
+  };
+
   useEffect(() => {
     void load();
   }, [uid]);
@@ -38,13 +45,16 @@ export const ResourceDefinitionPage: React.FC<{ uid?: string }> = ({ uid = '' })
       <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16, background: 'var(--panel-bg)' }}>
         <div style={{ fontSize: 24, fontWeight: 700 }}>Resource Definition</div>
         <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>
-          Current published definition and governance metadata for this resource.
+          Published resource metadata. Native dashboard editing remains in Grafana.
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="button" onClick={() => void load()} style={getButtonStyle()}>
           Refresh
+        </button>
+        <button type="button" onClick={openInGrafana} style={getButtonStyle()}>
+          Open in Grafana
         </button>
       </div>
 

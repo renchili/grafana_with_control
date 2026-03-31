@@ -63,6 +63,13 @@ export const DraftDetailPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
     }
   };
 
+  const openInGrafana = () => {
+    if (!data?.resourceUid) {
+      return;
+    }
+    window.location.href = `/d/${data.resourceUid}`;
+  };
+
   useEffect(() => {
     void load();
   }, [draftId]);
@@ -72,7 +79,7 @@ export const DraftDetailPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
       <div style={{ border: '1px solid var(--border-weak)', borderRadius: 8, padding: 16, background: 'var(--panel-bg)' }}>
         <div style={{ fontSize: 24, fontWeight: 700 }}>Draft Detail</div>
         <div style={{ color: 'var(--text-secondary)', marginTop: 6 }}>
-          Continue work on a governed draft and take controlled actions.
+          Draft lifecycle and controlled actions. Native dashboard editing remains in Grafana.
         </div>
       </div>
 
@@ -93,12 +100,21 @@ export const DraftDetailPage: React.FC<{ draftId?: string }> = ({ draftId = '0' 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <button
               type="button"
+              onClick={openInGrafana}
+              style={getButtonStyle()}
+            >
+              Open in Grafana
+            </button>
+
+            <button
+              type="button"
               onClick={() => void publish()}
               disabled={data.status !== 'active'}
               style={getButtonStyle({ disabled: data.status !== 'active' })}
             >
               Publish
             </button>
+
             <button
               type="button"
               onClick={() => void abandon()}
