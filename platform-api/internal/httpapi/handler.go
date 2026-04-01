@@ -17,6 +17,7 @@ func (h *Handler) Register(r gin.IRoutes) {
 	r.GET("/healthz", h.healthz)
 	r.GET("/me/drafts", h.listDrafts)
 	r.GET("/resources/:uid", h.getResourceDefinition)
+	r.POST("/resources/:uid/preview", h.previewResource)
 	r.POST("/resources/:uid/drafts", h.createDraftForResource)
 	r.GET("/drafts/:draftId", h.getDraftDetail)
 	r.POST("/drafts/:draftId/save", h.saveDraft)
