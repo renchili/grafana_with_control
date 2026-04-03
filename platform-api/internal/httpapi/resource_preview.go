@@ -7,13 +7,30 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
+const (
+	previewTagPrefix       = "preview-temp"
+	previewExpireTagPrefix = "preview-expire-at:"
+	previewTTL             = 1 * time.Minute
+)
+
+var previewCleanupOnce sync.Once
+
+func init() {
+	previewCleanupOnce.Do(func() {
+		go runPreviewCleanupLoop()
+	})
+}
+
 func (h *Handler) previewResource(c *gin.Context) {
+
 	uid := c.Param("uid")
 
 	source, err := fetchGrafanaDashboardByUID(uid)
@@ -22,27 +39,19 @@ func (h *Handler) previewResource(c *gin.Context) {
 		return
 	}
 
-	dashboard, ok := source["dashboard"].(map[string]any)
+	src, ok := source["dashboard"].(map[string]any)
 	if !ok {
 		c.JSON(http.StatusBadGateway, gin.H{"message": "invalid grafana dashboard payload"})
 		return
 	}
 
-	preview := cloneAnyMap(dashboard)
-	delete(preview, "id")
-	delete(preview, "version")
-	delete(preview, "id")
-	delete(preview, "version")
-	delete(preview, "id")
-	delete(preview, "version")
-
 	previewUID := fmt.Sprintf("%s-preview-%d", uid, time.Now().Unix())
-	preview["uid"] = previewUID
-	if title, ok := preview["title"].(string); ok && title != "" {
-		preview["title"] = title + " [Preview]"
+	title, _ := src["title"].(string)
+	if title == "" {
+		title = uid
 	}
 
-	rawPanels, _ := preview["panels"].([]any)
+	rawPanels, _ := src["panels"].([]any)
 
 	banner := map[string]any{
 		"id":    999999,
@@ -86,7 +95,24 @@ func (h *Handler) previewResource(c *gin.Context) {
 		shifted = append(shifted, cp)
 	}
 
-	preview["panels"] = shifted
+	expireAt := time.Now().Add(previewTTL).Unix()
+	tags := readStringSlice(src["tags"])
+	tags = append(tags, previewTagPrefix, previewExpireTagPrefix+strconv.FormatInt(expireAt, 10))
+
+	clean := map[string]any{
+		"id":            nil,
+		"uid":           previewUID,
+		"title":         title + " [Preview]",
+		"schemaVersion": src["schemaVersion"],
+		"version":       0,
+		"tags":          tags,
+		"timezone":      src["timezone"],
+		"refresh":       src["refresh"],
+		"editable":      false,
+		"panels":        shifted,
+	}
+
+	fmt.Printf("preview create uid=%s tags=%v\n", previewUID, tags)
 
 	baseURL := strings.TrimRight(os.Getenv("GRAFANA_URL"), "/")
 	if baseURL == "" {
@@ -94,7 +120,7 @@ func (h *Handler) previewResource(c *gin.Context) {
 	}
 
 	body := map[string]any{
-		"dashboard": preview,
+		"dashboard": clean,
 		"overwrite": false,
 		"message":   "preview from grafana control plane",
 	}
@@ -127,9 +153,138 @@ func (h *Handler) previewResource(c *gin.Context) {
 		return
 	}
 
+	scheme := c.GetHeader("X-Forwarded-Proto")
+	if scheme == "" {
+		scheme = "http"
+		if c.Request.TLS != nil {
+			scheme = "https"
+		}
+	}
+
+	host := c.GetHeader("X-Forwarded-Host")
+	if host == "" {
+		host = c.Request.Host
+	}
+
+	publicURL := fmt.Sprintf("%s://%s/d/%s/preview", scheme, host, previewUID)
+
 	c.JSON(http.StatusOK, gin.H{
-		"url": fmt.Sprintf("%s/d/%s/preview", baseURL, previewUID),
+		"url":        publicURL,
+		"previewUid": previewUID,
+		"expireAt":   expireAt,
 	})
+}
+
+func runPreviewCleanupLoop() {
+	fmt.Println("preview cleanup loop started")
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		if err := cleanupExpiredPreviewDashboards(); err != nil {
+			fmt.Printf("preview cleanup error: %v\n", err)
+		}
+		<-ticker.C
+	}
+}
+
+func cleanupExpiredPreviewDashboards() error {
+	fmt.Println("preview cleanup tick")
+	baseURL := strings.TrimRight(os.Getenv("GRAFANA_URL"), "/")
+	if baseURL == "" {
+		baseURL = "http://grafana:3000"
+	}
+
+	req, err := http.NewRequest(http.MethodGet, baseURL+"/api/search?type=dash-db&tag="+previewTagPrefix, nil)
+	if err != nil {
+		return err
+	}
+	applyGrafanaAuth(req)
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode >= 300 {
+		body, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
+		return fmt.Errorf("search preview dashboards failed: %s", strings.TrimSpace(string(body)))
+	}
+
+	var items []map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&items); err != nil {
+		return err
+	}
+
+	fmt.Printf("preview cleanup found %d dashboards\n", len(items))
+
+	now := time.Now().Unix()
+
+	for _, item := range items {
+		uid, _ := item["uid"].(string)
+		if uid == "" {
+			continue
+		}
+
+		detail, err := fetchGrafanaDashboardByUID(uid)
+		if err != nil {
+			continue
+		}
+
+		dashboard, ok := detail["dashboard"].(map[string]any)
+		if !ok {
+			continue
+		}
+
+		tags := readStringSlice(dashboard["tags"])
+		expireAt, ok := extractExpireAt(tags)
+		if !ok {
+			fmt.Printf("preview cleanup skip uid=%s reason=no-expire-tag\n", uid)
+			continue
+		}
+		if now < expireAt {
+			fmt.Printf("preview cleanup keep uid=%s expireAt=%d now=%d\n", uid, expireAt, now)
+			continue
+		}
+
+		fmt.Printf("preview cleanup delete uid=%s expireAt=%d now=%d\n", uid, expireAt, now)
+		if err := deleteGrafanaDashboardByUID(uid); err != nil {
+			fmt.Printf("preview cleanup delete failed uid=%s err=%v\n", uid, err)
+		} else {
+			fmt.Printf("preview cleanup delete success uid=%s\n", uid)
+		}
+	}
+
+	return nil
+}
+
+func deleteGrafanaDashboardByUID(uid string) error {
+	baseURL := strings.TrimRight(os.Getenv("GRAFANA_URL"), "/")
+	if baseURL == "" {
+		baseURL = "http://grafana:3000"
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, baseURL+"/api/dashboards/uid/"+uid, nil)
+	if err != nil {
+		return err
+	}
+	applyGrafanaAuth(req)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	res, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode >= 300 && res.StatusCode != 404 {
+		body, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
+		return fmt.Errorf("delete preview failed: %s", strings.TrimSpace(string(body)))
+	}
+
+	return nil
 }
 
 func fetchGrafanaDashboardByUID(uid string) (map[string]any, error) {
@@ -179,4 +334,34 @@ func cloneAnyMap(in map[string]any) map[string]any {
 		out[k] = v
 	}
 	return out
+}
+
+func readStringSlice(v any) []string {
+	raw, ok := v.([]any)
+	if !ok {
+		if s, ok := v.([]string); ok {
+			return append([]string{}, s...)
+		}
+		return []string{}
+	}
+	out := make([]string, 0, len(raw))
+	for _, item := range raw {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func extractExpireAt(tags []string) (int64, bool) {
+	for _, tag := range tags {
+		if strings.HasPrefix(tag, previewExpireTagPrefix) {
+			v := strings.TrimPrefix(tag, previewExpireTagPrefix)
+			ts, err := strconv.ParseInt(v, 10, 64)
+			if err == nil {
+				return ts, true
+			}
+		}
+	}
+	return 0, false
 }
