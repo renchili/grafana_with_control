@@ -16,10 +16,10 @@ services:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_DEFAULT_APP_MODE: development
-      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: rody-grafanacontrol-app
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: rody-grafanacontrolplane-app
     volumes:
       - grafana-storage:/var/lib/grafana
-      - ../grafana-control-plane-plugin-full:/var/lib/grafana/plugins/rody-grafanacontrol-app
+      - ../rody-grafanacontrolplane-app/dist:/var/lib/grafana/plugins/rody-grafanacontrolplane-app
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
 
   mysql:
