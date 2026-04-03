@@ -153,20 +153,18 @@ func (h *Handler) previewResource(c *gin.Context) {
 		return
 	}
 
-	scheme := c.GetHeader("X-Forwarded-Proto")
-	if scheme == "" {
-		scheme = "http"
-		if c.Request.TLS != nil {
-			scheme = "https"
-		}
-	}
-
 	host := c.GetHeader("X-Forwarded-Host")
 	if host == "" {
 		host = c.Request.Host
 	}
+	if host == "" {
+		host = c.Request.Host
+	}
+	if !strings.HasPrefix(host, "http://") && !strings.HasPrefix(host, "https://") {
+		host = "http://" + host
+	}
 
-	publicURL := fmt.Sprintf("%s://%s/d/%s/preview", scheme, host, previewUID)
+	publicURL := fmt.Sprintf("%s/d/%s/preview", strings.TrimRight(host, "/"), previewUID)
 
 	c.JSON(http.StatusOK, gin.H{
 		"url":        publicURL,

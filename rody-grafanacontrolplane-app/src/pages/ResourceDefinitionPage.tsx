@@ -29,10 +29,31 @@ export const ResourceDefinitionPage: React.FC<{ uid?: string }> = ({ uid = '' })
     }
   };
 
-  const openPreviewWindow = () => {
-    const grafanaTarget = `${window.location.origin}/d/${uid}`;
-    const bridge = `${window.location.origin}/a/rody-grafanacontrolplane-app/grafana-preview/${encodeURIComponent(grafanaTarget)}`;
-    window.open(bridge, '_blank', 'noopener,noreferrer');
+  const openPreviewWindow = async () => {
+    setError('');
+    try {
+      const resp = await fetch(`/api/platform/v1/resources/${uid}/preview`, {
+        method: 'POST',
+      });
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      const json = await resp.json();
+      if (!json?.url) {
+        throw new Error('preview url missing');
+      }
+
+      // 不拼接任何前缀，不走 /a/...，不走 locationService.push
+      const a = document.createElement('a');
+a.href = json.url;
+a.target = '_blank';
+a.rel = 'noopener noreferrer';
+document.body.appendChild(a);
+a.click();
+document.body.removeChild(a);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to open preview');
+    }
   };
 
   useEffect(() => {
@@ -48,11 +69,11 @@ export const ResourceDefinitionPage: React.FC<{ uid?: string }> = ({ uid = '' })
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button type="button" onClick={() => void load()} style={getButtonStyle()}>
           Refresh
         </button>
-        <button type="button" onClick={openPreviewWindow} style={getButtonStyle()}>
+        <button type="button" onClick={() => void openPreviewWindow()} style={getButtonStyle()}>
           Preview
         </button>
       </div>
